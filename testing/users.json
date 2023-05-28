@@ -1,0 +1,50 @@
+{
+  "user1": {
+    "username": "user1",
+    "password": "passwordpassword",
+    "email": "email@realemail.com",
+    "google_calendar_id": "google_calendar_id321"
+  },
+  "user2": {
+    "username": "user2",
+    "password": "this is a password"
+  },
+  "user2repeat": {
+    "username": "user2",
+    "password": "passwordpassword",
+    "email": "email@realemail.com"
+  },
+  "user3": {
+    "username": "user 1",
+    "password": "passwordpassword",
+    "email": "email@realemail.com"
+  },
+  "invalid1": {
+    "username": "",
+    "password": "passwordpassword",
+    "email": "email@realemail.com"
+  },
+  "invalid2": {
+    "username": "a",
+    "password": "",
+    "email": "email@realemail.com"
+  },
+  "invalid3": {
+    "username": "",
+    "password": "passwordpassword",
+    "email": "email@realemail.com"
+  },
+  "invalid4": {
+    "password": "passwordpassword",
+    "email": "email@realemail.com"
+  },
+  "invalid5": {
+    "username": "ueao",
+    "email": "email@realemail.com"
+  },
+  "invalid6": {
+    "username": "unique",
+    "password": "2short",
+    "email": "email@realemail.com"
+  }
+}
