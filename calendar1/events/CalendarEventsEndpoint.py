@@ -3,6 +3,8 @@ import datetime
 import json
 from datetime import time, datetime
 import calendar
+from enum import Enum
+
 from fastapi import APIRouter, HTTPException
 import mysql.connector
 from mysql.connector import Error
@@ -16,21 +18,34 @@ from dateutil.rrule import rrulestr, rrule
 
 router = APIRouter()
 
+# TODO: review how we parse days from a 4-byte format
+# TODO: revise system for event + user ids so that we can just auto-increment them from 0
+# TODO: fix how monthyear strings are parsed and accessed
+# TODO: fix get requests to use {} queries in url
 
 class CalendarEventsEndpoint:
     recurrent_event_limit = 5000  # number of events that can be attached to one recurrence_id
     user_recurrent_limit = 500  # number of recurrent_ids that can be attached to each user
-    monthyear_buffer_limit = 1200 / 6  # max number of monthyears that can be buffered for a single event
+
+    class RecurrenceType(Enum):
+        EventOnly = 1
+        TodoOnly = 2
+        Both = 3
+
+    monthyear_buffer_limit = 1080 # max number of monthyears that can be buffered for a single event
     day_in_seconds = 86401
+    measuring_units_char_limit = 12
+
 
     try:
-        connection = mysql.connector.connect(
+        google_db_connection = mysql.connector.connect(
             host='34.31.57.31',
             database='calendars',
             user='root',
             password='supersecretdatabase$$keepout',
             autocommit=True
         )
+        connection = google_db_connection
         cursor = connection.cursor(dictionary=True)
         if connection.is_connected():
             print('Connected to calendars database')
@@ -48,15 +63,16 @@ class CalendarEventsEndpoint:
         event_id = user_event_id[10:]
         if event.recurrenceId is None:
             # new recurrence sequence
-            CalendarEventsEndpoint.cursor.execute("SELECT * FROM recurrence_ids_by_user WHERE user_id = %s;", (user_id,))
+            CalendarEventsEndpoint.cursor.execute("SELECT * FROM event_recurrence_ids_by_user WHERE user_id = %s;", (user_id,))
             recurrence_ids_string: str = CalendarEventsEndpoint.cursor.fetchone()[1]
             if len(recurrence_ids_string) >= CalendarEventsEndpoint.user_recurrent_limit * 8:
                 raise HTTPException(detail="User has reached their limit on repeating events. Please delete a repeating event series before creating another one", status_code=400)
             #create and add the new recurrence object
-            CalendarEventsEndpoint.cursor.execute(f"INSERT INTO recurrences_by_id COLUMNS (user_id, rrule_string) VALUES (%s, %s);", (user_id, event.rruleString))
+            CalendarEventsEndpoint.cursor.execute(f"INSERT INTO event_recurrences_by_id COLUMNS (user_id, rrule_string) VALUES (%s, %s);", (user_id, event.rruleString))
             new_recurrence_id = CalendarEventsEndpoint.cursor.lastrowid
             recurrence_ids_string += new_recurrence_id  # add recurrence id to list of users' recurrence_ids
             event.recurrenceId = int(new_recurrence_id)
+            CalendarEventsEndpoint.cursor.execute("UPDATE event_recurrence_ids_by_user SET recurrence_ids = %s WHERE user_id = %s", (recurrence_ids_string, user_id))
         else:
             # recurrence sequence already defined, this is just a child event of the sequence
             # inserting event_id into the recurrence children_event_ids should be handled separately
@@ -67,9 +83,9 @@ class CalendarEventsEndpoint:
                                               f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);", (event.name, event.description, event.startInstant, event.endInstant, event.startDay, event.duration, event.rruleString, event.recurrenceId, event.happened, event.report, event.eventType, user_event_id))
         # insert into recurrent_ids_by_user if applicable
         if event.recurrenceId is not None:
-            CalendarEventsEndpoint.cursor.execute(f"SELECT * FROM recurrences_by_id WHERE recurrence_id = %s;", (event.recurrenceId))
+            CalendarEventsEndpoint.cursor.execute(f"SELECT * FROM event_recurrences_by_id WHERE recurrence_id = %s;", (event.recurrenceId))
             new_event_ids_string = CalendarEventsEndpoint.cursor.fetchall()[0]["children_event_ids"] + event.eventId.__str__()
-            CalendarEventsEndpoint.cursor.execute(f"UPDATE recurrences_by_id SET childen_event_ids =  %s WHERE recurrence_id = %s;", (new_event_ids_string, event.recurrenceId))
+            CalendarEventsEndpoint.cursor.execute(f"UPDATE event_recurrences_by_id SET childen_event_ids =  %s WHERE recurrence_id = %s;", (new_event_ids_string, event.recurrenceId))
 
         # insert into events_by_user_day
         day = event.startDay
@@ -88,7 +104,8 @@ class CalendarEventsEndpoint:
     def generate_repeating_events(user_id: int, api_key: str, recurrence_id: int, month: datetime.month, year: datetime.year):
         if not UsersEndpoint.authenticate(user_id, api_key):
             return "User is not authenticated, please log in", 401
-        CalendarEventsEndpoint.cursor.execute("SELECT * FROM recurrences_by_id WHERE recurrence_id = %s;", (recurrence_id,))
+        CalendarEventsEndpoint.cursor.execute("SELECT * FROM event_recurrences_by_id WHERE recurrence_id = %s;", (recurrence_id,))
+        # TODO: cannot call .fetchone() multiple times like this. need to fix
         monthyears_buffered_string = CalendarEventsEndpoint.cursor.fetchone()["monthyears_buffered"]
         children_event_ids_string = CalendarEventsEndpoint.cursor.fetchone()["childen_event_ids"]
         event_name = CalendarEventsEndpoint.cursor.fetchone()["event_name"]
@@ -120,7 +137,7 @@ class CalendarEventsEndpoint:
             children_event_ids_string = CalendarEventsEndpoint.insert_event_id_into_children_events_string(children_event_ids_string, event_id, event.startDay, user_id.__str__(), index_inserted)
             # insert into database baby!
             CalendarEventsEndpoint.cursor.execute(
-                f"UPDATE recurrences_by_id SET children_event_ids = %s WHERE recurrence_id = %s;", (children_event_ids_string, recurrence_id))
+                f"UPDATE event_recurrences_by_id SET children_event_ids = %s WHERE recurrence_id = %s;", (children_event_ids_string, recurrence_id))
             x = rrule.after(x)
             CalendarEventsEndpoint.add_calendar_event(user_id, api_key, event)
         return "successfully generated events!", 200
@@ -160,7 +177,7 @@ class CalendarEventsEndpoint:
         # generate repeating events for given day
         # TODO make this a lot faster so we don't need to call it every time we get events for a given day
         dt = datetime.fromtimestamp(day)
-        CalendarEventsEndpoint.cursor.execute(f"SELECT * FROM recurrences_by_user WHERE user_id = %s;", (user_id,))
+        CalendarEventsEndpoint.cursor.execute(f"SELECT * FROM event_recurrence_ids_by_user WHERE user_id = %s;", (user_id,))
         recurrence_ids = CalendarEventsEndpoint.split_string_into_substrings(CalendarEventsEndpoint.cursor.fetchone()["recurrence_ids"], 8)
         for recurrence_id in recurrence_ids:
             CalendarEventsEndpoint.generate_repeating_events(user_id, api_key, int(recurrence_id), dt.month, dt.year)
@@ -189,8 +206,8 @@ class CalendarEventsEndpoint:
         if res is None:
             raise HTTPException(detail=f"event of id: {event_id} could not be found", status_code=404)
         day = res["start_day"]
-        CalendarEventsEndpoint.cursor.execute(f"DELETE * FROM events_by_user_event_id WHERE user_event_id = %s;", (user_id.__str__() + event_id.__str__()),)
-        CalendarEventsEndpoint.cursor.execute(f"DELETE * FROM events_by_user_day WHERE key_id = %s;", (user_id.__str__() + day.__str__),)
+        CalendarEventsEndpoint.cursor.execute(f"DELETE FROM events_by_user_event_id WHERE user_event_id = %s;", (user_id.__str__() + event_id.__str__()),)
+        CalendarEventsEndpoint.cursor.execute(f"DELETE FROM events_by_user_day WHERE key_id = %s;", (user_id.__str__() + day.__str__),)
         return f"successfully deleted event with id: '{event_id}'", 200
 
     @staticmethod
@@ -199,9 +216,9 @@ class CalendarEventsEndpoint:
         if not UsersEndpoint.authenticate(user_id, api_key):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         CalendarEventsEndpoint.cursor.execute(
-            f"DELETE * FROM events_by_user_event_id WHERE user_event_id BETWEEN %s AND %s;", (user_id.__str__() + "000000000", (user_id+1).__str__() + "000000000"))
+            f"DELETE FROM events_by_user_event_id WHERE user_event_id BETWEEN %s AND %s;", (user_id.__str__() + "000000000", (user_id+1).__str__() + "000000000"))
         CalendarEventsEndpoint.cursor.execute(
-            f"DELETE * FROM events_by_user_day WHERE key_id BETWEEN %s AND %s;", (user_id.__str__() + "000000000", (user_id+1).__str__() + "000000000"))
+            f"DELETE FROM events_by_user_day WHERE key_id BETWEEN %s AND %s;", (user_id.__str__() + "000000000", (user_id+1).__str__() + "000000000"))
         return "successfully deleted user_id + " + user_id.__str__() + "!!", 200
 
     @staticmethod
@@ -278,4 +295,12 @@ class CalendarEventsEndpoint:
     def get_event_start_day_from_id(event_id:str, user_id: str):
         CalendarEventsEndpoint.cursor.execute(f"SELECT * FROM events_by_user_event_id WHERE user_event_id = {user_id}{event_id};")
         return CalendarEventsEndpoint.cursor.fetchone()["start_day"]
+
+
+
+
+
+
+
+
 

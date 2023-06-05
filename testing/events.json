@@ -1,0 +1,39 @@
+{
+  "user1event1": {
+    "name": "",
+    "description": "",
+    "startInstant": 0,
+    "startDay": 0,
+    "duration": 0,
+    "endInstant": 0
+    "rruleString": "",
+    isInPast: False,
+    happened: bool
+    report: str
+    eventType: int
+  },
+  "user1event2": {
+
+  },
+  "user1event3": {
+
+  },
+  "user2event1": {
+
+  },
+  "user2event2": {
+
+  },
+  "user2event3": {
+
+  },
+  "user3event1": {
+
+  },
+  "user3event2": {
+
+  },
+  "user3event3": {
+
+  }
+}

@@ -10,6 +10,6 @@ class User(BaseModel):
     email: Optional[str]
     date_joined: Optional[int]
     google_calendar_id: Optional[str]
-    salt: Optional[str] = None
+    salt: Optional[bytes] = None
 
 

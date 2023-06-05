@@ -1,9 +1,11 @@
+from typing import Optional
+
 from pydantic import BaseModel
 from typing_extensions import Any
 
 
 class UserAsParameter(BaseModel):
-    username: str
-    password: str
-    email: str
-    google_calendar_id: str
+    username: Optional[str]
+    password: Optional[str]
+    email: Optional[str]
+    google_calendar_id: Optional[str]

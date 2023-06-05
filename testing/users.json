@@ -7,7 +7,7 @@
   },
   "user2": {
     "username": "user2",
-    "password": "this is a password"
+    "password": "this  a pa?s!@sw&ord1234AOEU9$#$"
   },
   "user2repeat": {
     "username": "user2",
@@ -17,7 +17,7 @@
   "user3": {
     "username": "user 1",
     "password": "passwordpassword",
-    "email": "email@realemail.com"
+    "email": "em234a-il@real445UEOA-em.ail.com"
   },
   "invalid1": {
     "username": "",
@@ -30,8 +30,8 @@
     "email": "email@realemail.com"
   },
   "invalid3": {
-    "username": "",
-    "password": "passwordpassword",
+    "username": "hellow babay",
+    "password": "passwordpassword**",
     "email": "email@realemail.com"
   },
   "invalid4": {
@@ -46,5 +46,25 @@
     "username": "unique",
     "password": "2short",
     "email": "email@realemail.com"
+  },
+  "invalid7": {
+    "username": "hellowaoeu",
+    "password": "badpassword\\",
+    "email": "email@realemail.com"
+  },
+  "invalid8": {
+    "username": "hellowaoeu",
+    "password": "badpassword\\",
+    "email": "emailrealemail.com"
+  },
+    "invalid9": {
+    "username": "hellowaoeu",
+    "password": "badpassword\\",
+    "email": "ema @aoeu.com"
+  },
+  "invalid10": {
+    "username": "hellowao{{{{eu",
+    "password": "password password",
+    "email": "ema @aoeu.com"
   }
 }
