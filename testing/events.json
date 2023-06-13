@@ -5,7 +5,7 @@
     "startInstant": 0,
     "startDay": 0,
     "duration": 0,
-    "endInstant": 0
+    "endInstant": 0,
     "rruleString": "",
     isInPast: False,
     happened: bool

@@ -1,3 +1,5 @@
+# CREATED JUNE OF 2023 BY SPENCER CHAVEZ
+
 from pydantic import BaseModel
 from pydantic.class_validators import Optional
 
