@@ -1,3 +1,5 @@
+# CREATED JUNE OF 2023 BY SPENCER CHAVEZ
+
 import json
 from random import random
 import requests

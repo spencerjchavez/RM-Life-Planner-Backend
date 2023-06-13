@@ -26,17 +26,16 @@ router = APIRouter()
 class CalendarEventsEndpoint:
     recurrent_event_limit = 5000  # number of events that can be attached to one recurrence_id
     user_recurrent_limit = 500  # number of recurrent_ids that can be attached to each user
+    monthyear_buffer_limit = 1080 # max number of monthyears that can be buffered for a single event
+    #day_in_seconds = 86401
+    measuring_units_char_limit = 12
 
     class RecurrenceType(Enum):
         EventOnly = 1
         TodoOnly = 2
         Both = 3
 
-    monthyear_buffer_limit = 1080 # max number of monthyears that can be buffered for a single event
-    day_in_seconds = 86401
-    measuring_units_char_limit = 12
-
-
+    # connect to sql database
     try:
         google_db_connection = mysql.connector.connect(
             host='34.31.57.31',
@@ -62,17 +61,7 @@ class CalendarEventsEndpoint:
         user_event_id = res["user_event_id"] + 1 if res is not None else "100000000"
         event_id = user_event_id[10:]
         if event.recurrenceId is None:
-            # new recurrence sequence
-            CalendarEventsEndpoint.cursor.execute("SELECT * FROM event_recurrence_ids_by_user WHERE user_id = %s;", (user_id,))
-            recurrence_ids_string: str = CalendarEventsEndpoint.cursor.fetchone()[1]
-            if len(recurrence_ids_string) >= CalendarEventsEndpoint.user_recurrent_limit * 8:
-                raise HTTPException(detail="User has reached their limit on repeating events. Please delete a repeating event series before creating another one", status_code=400)
-            #create and add the new recurrence object
-            CalendarEventsEndpoint.cursor.execute(f"INSERT INTO event_recurrences_by_id COLUMNS (user_id, rrule_string) VALUES (%s, %s);", (user_id, event.rruleString))
-            new_recurrence_id = CalendarEventsEndpoint.cursor.lastrowid
-            recurrence_ids_string += new_recurrence_id  # add recurrence id to list of users' recurrence_ids
-            event.recurrenceId = int(new_recurrence_id)
-            CalendarEventsEndpoint.cursor.execute("UPDATE event_recurrence_ids_by_user SET recurrence_ids = %s WHERE user_id = %s", (recurrence_ids_string, user_id))
+            event.recurrenceId = CalendarEventsEndpoint.add_recurrence(user_id, api_key, event.rruleString, False, True)[0]
         else:
             # recurrence sequence already defined, this is just a child event of the sequence
             # inserting event_id into the recurrence children_event_ids should be handled separately
@@ -99,48 +88,6 @@ class CalendarEventsEndpoint:
             event_ids = row[1] + event_id
             CalendarEventsEndpoint.cursor.execute(f"UPDATE events_by_user_day SET event_ids = %s WHERE key_id = %s;", (event_ids, key_id))
         return {"message": "event successfully added", "event_id" : event_id.__str__()}, 200,
-
-    @staticmethod
-    def generate_repeating_events(user_id: int, api_key: str, recurrence_id: int, month: datetime.month, year: datetime.year):
-        if not UsersEndpoint.authenticate(user_id, api_key):
-            return "User is not authenticated, please log in", 401
-        CalendarEventsEndpoint.cursor.execute("SELECT * FROM event_recurrences_by_id WHERE recurrence_id = %s;", (recurrence_id,))
-        # TODO: cannot call .fetchone() multiple times like this. need to fix
-        monthyears_buffered_string = CalendarEventsEndpoint.cursor.fetchone()["monthyears_buffered"]
-        children_event_ids_string = CalendarEventsEndpoint.cursor.fetchone()["childen_event_ids"]
-        event_name = CalendarEventsEndpoint.cursor.fetchone()["event_name"]
-        event_description = CalendarEventsEndpoint.cursor.fetchone()["event_description"]
-        event_type = CalendarEventsEndpoint.cursor.fetchone()["event_type"]
-        rrule_string = CalendarEventsEndpoint.cursor.fetchone()["rrule_string"]
-        event_end = CalendarEventsEndpoint.cursor.fetchone()["event_end_time"]
-
-        if len(monthyears_buffered_string) / 6 >= CalendarEventsEndpoint.monthyear_buffer_limit:
-            raise HTTPException(detail=f"Cannot generate more events of recurrence_id: {recurrence_id}. Please create a new repeating event series instead", status_code=400)
-
-        new_string, was_inserted, index_inserted = CalendarEventsEndpoint.insert_monthyear_into_monthyears_string(monthyears_buffered_string, month, year)
-        if not was_inserted:
-            return f"monthyear {month}{year} was already generated silly"
-
-        rrule = rrulestr(rrule_string)
-        event_start: datetime = rrule.dtstart
-        event_duration = event_end - event_start.timestamp()
-        x = datetime(month=month, year=year, day=event_start.day if event_start.month == month and event_start.year == year else 0, minute=rrule._dtstart.minute, hour=rrule._dtstart.hour)
-        x = rrule.after(x, True)
-        while x.month == month and x.year == year:  # if finished generating events in this monthyear
-            event_day = datetime(day=x.day, month=x.month, year=x.year).timestamp()
-            event = CalendarEventAsParameter(name=event_name, description=event_description, startInstant=x.timestamp(), startDay=event_day, endInstant=x.timestamp() + event_duration, recurrenceId=recurrence_id, event_type=event_type, rruleString=rrule_string)
-            res = CalendarEventsEndpoint.add_calendar_event(user_id, api_key, event)
-
-            event_id = res[0]["event_id"]
-            # TODO: in the future, need to modify the insert_event_id function so that it can take in
-            #  the entire string of event ids and insert them all at the same time instead of doing each on individually
-            children_event_ids_string = CalendarEventsEndpoint.insert_event_id_into_children_events_string(children_event_ids_string, event_id, event.startDay, user_id.__str__(), index_inserted)
-            # insert into database baby!
-            CalendarEventsEndpoint.cursor.execute(
-                f"UPDATE event_recurrences_by_id SET children_event_ids = %s WHERE recurrence_id = %s;", (children_event_ids_string, recurrence_id))
-            x = rrule.after(x)
-            CalendarEventsEndpoint.add_calendar_event(user_id, api_key, event)
-        return "successfully generated events!", 200
 
     @staticmethod
     @router.put("/api/calendar/events/{event_id}")
@@ -292,9 +239,84 @@ class CalendarEventsEndpoint:
 
 
     @staticmethod
-    def get_event_start_day_from_id(event_id:str, user_id: str):
+    def get_event_start_day_from_id(event_id: str, user_id: str):
         CalendarEventsEndpoint.cursor.execute(f"SELECT * FROM events_by_user_event_id WHERE user_event_id = {user_id}{event_id};")
         return CalendarEventsEndpoint.cursor.fetchone()["start_day"]
+
+    # recurrences stuff
+    @staticmethod
+    def add_recurrence(user_id: int, api_key: str, rrule_str: str, create_todos: bool, create_events: bool):
+        # new recurrence sequence
+        CalendarEventsEndpoint.cursor.execute("SELECT * FROM recurrence_ids_by_user WHERE user_id = %s;",
+                                              (user_id,))
+        recurrence_ids_bytes: bytes = CalendarEventsEndpoint.cursor.fetchone()["recurrence_ids"]
+        if len(recurrence_ids_bytes) >= CalendarEventsEndpoint.user_recurrent_limit * 8:
+            raise HTTPException(
+                detail="User has reached their limit on repeating events. Please delete a repeating event series before creating another one",
+                status_code=400)
+        # create and add the new recurrence object
+        CalendarEventsEndpoint.cursor.execute(
+            f"INSERT INTO recurrences (user_id, rrule_string, monthyears_buffered, ) VALUES (%s, %s);",
+            (user_id, event.rruleString))
+        new_recurrence_id = CalendarEventsEndpoint.cursor.lastrowid
+        recurrence_ids_string += new_recurrence_id  # add recurrence id to list of users' recurrence_ids
+        event.recurrenceId = int(new_recurrence_id)
+        CalendarEventsEndpoint.cursor.execute(
+            "UPDATE event_recurrence_ids_by_user SET recurrence_ids = %s WHERE user_id = %s",
+            (recurrence_ids_string, user_id))
+
+    @staticmethod
+    def generate_recurrence_events(user_id: int, api_key: str, recurrence_id: int, month: datetime.month,
+                                   year: datetime.year):
+        if not UsersEndpoint.authenticate(user_id, api_key):
+            return "User is not authenticated, please log in", 401
+        CalendarEventsEndpoint.cursor.execute("SELECT * FROM event_recurrences_by_id WHERE recurrence_id = %s;",
+                                              (recurrence_id,))
+        # TODO: cannot call .fetchone() multiple times like this. need to fix
+        monthyears_buffered_string = CalendarEventsEndpoint.cursor.fetchone()["monthyears_buffered"]
+        children_event_ids_string = CalendarEventsEndpoint.cursor.fetchone()["childen_event_ids"]
+        event_name = CalendarEventsEndpoint.cursor.fetchone()["event_name"]
+        event_description = CalendarEventsEndpoint.cursor.fetchone()["event_description"]
+        event_type = CalendarEventsEndpoint.cursor.fetchone()["event_type"]
+        rrule_string = CalendarEventsEndpoint.cursor.fetchone()["rrule_string"]
+        event_end = CalendarEventsEndpoint.cursor.fetchone()["event_end_time"]
+
+        if len(monthyears_buffered_string) / 6 >= CalendarEventsEndpoint.monthyear_buffer_limit:
+            raise HTTPException(
+                detail=f"Cannot generate more events of recurrence_id: {recurrence_id}. Please create a new repeating event series instead",
+                status_code=400)
+
+        new_string, was_inserted, index_inserted = CalendarEventsEndpoint.insert_monthyear_into_monthyears_string(
+            monthyears_buffered_string, month, year)
+        if not was_inserted:
+            return f"monthyear {month}{year} was already generated silly"
+
+        rrule = rrulestr(rrule_string)
+        event_start: datetime = rrule.dtstart
+        event_duration = event_end - event_start.timestamp()
+        x = datetime(month=month, year=year,
+                     day=event_start.day if event_start.month == month and event_start.year == year else 0,
+                     minute=rrule._dtstart.minute, hour=rrule._dtstart.hour)
+        x = rrule.after(x, True)
+        while x.month == month and x.year == year:  # if finished generating events in this monthyear
+            event_day = datetime(day=x.day, month=x.month, year=x.year).timestamp()
+            event = CalendarEventAsParameter(name=event_name, description=event_description, startInstant=x.timestamp(),
+                                             startDay=event_day, endInstant=x.timestamp() + event_duration,
+                                             recurrenceId=recurrence_id, event_type=event_type, rruleString=rrule_string)
+            res = CalendarEventsEndpoint.add_calendar_event(user_id, api_key, event)
+
+            event_id = res[0]["event_id"]
+            # TODO: in the future, need to modify the insert_event_id function so that it can take in
+            #  the entire string of event ids and insert them all at the same time instead of doing each one individually
+            children_event_ids_string = CalendarEventsEndpoint.insert_event_id_into_children_events_string(
+                children_event_ids_string, event_id, event.startDay, user_id.__str__(), index_inserted)
+            # insert into database baby!
+            CalendarEventsEndpoint.cursor.execute(
+                f"UPDATE event_recurrences_by_id SET children_event_ids = %s WHERE recurrence_id = %s;",
+                (children_event_ids_string, recurrence_id))
+            x = rrule.after(x)
+            CalendarEventsEndpoint.add_calendar_event(user_id, api_key, event)
+        return "successfully generated events!", 200
 
 
 

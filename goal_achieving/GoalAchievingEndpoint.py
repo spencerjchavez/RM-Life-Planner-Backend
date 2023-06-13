@@ -1,3 +1,5 @@
+# CREATED JUNE OF 2023 BY SPENCER CHAVEZ
+
 import json
 from enum import Enum
 
@@ -5,16 +7,13 @@ import mysql.connector
 from mysql.connector import Error
 from fastapi import APIRouter, HTTPException
 from goal_achieving.DesireAsParameter import DesireAsParameter
-from goal_achieving.Desire import Desire
 from goal_achieving.PlanAsParameter import PlanAsParameter
-from goal_achieving.Plan import Plan
 from goal_achieving.GoalAsParameter import GoalAsParameter
-from goal_achieving.Goal import Goal
 from goal_achieving.ActionAsParameter import ActionAsParameter
-from goal_achieving.Action import Action
 from goal_achieving.DesireCategoryAsParameter import DesireCategoryAsParameter
-from goal_achieving.DesireCategory import DesireCategory
 from users import UsersEndpoint
+from BytesHelper import BytesHelper
+from calendar1.events.CalendarEventsEndpoint import CalendarEventsEndpoint
 
 router = APIRouter()
 
@@ -132,17 +131,11 @@ class GoalAchievingEndpoint:
 
         GoalAchievingEndpoint.cursor.execute("SELECT * FROM desire_ids_by_user WHERE user_id = %s", user_id)
         desire_ids_bytes: bytes = GoalAchievingEndpoint.cursor.fetchone()["desire_ids"]
-        desire_id_bytes = desire_id.to_bytes(4, "big", signed=False)
-        index = 0
-        while True:
-            index = desire_ids_bytes.find(desire_id_bytes, index)
-            if index == -1:
+        desire_ids_bytes = BytesHelper.remove_unsigned_int_from_bytes(desire_ids_bytes, desire_id)
+        if desire_ids_bytes is None:
                 print("ERROR: desire was created in desires database but not found in desires_ids_by_user database")
                 return f"Desire with ID {desire_id} deleted successfully", 200
-            if index % 4 == 0:
-                desire_ids_bytes = desire_ids_bytes[:index] + desire_ids_bytes[index+4:]
-                break
-            index += 1
+
         GoalAchievingEndpoint.cursor.execute("UPDATE desire_ids_by_user SET desire_ids = %s", desire_ids_bytes)
         return f"Desire with ID {desire_id} deleted successfully", 200
 
@@ -172,7 +165,7 @@ class GoalAchievingEndpoint:
         res = GoalAchievingEndpoint.cursor.fetchone().__dict__
         if res["user_id"] != user_id:
             raise HTTPException(detail="User is not authenticated to access this element", status_code=401)
-        return res.__dict__, 200
+        return res, 200
 
     @staticmethod
     @router.put("/api/desires/categories{category_id}")
@@ -222,84 +215,143 @@ class GoalAchievingEndpoint:
         if len(goal_ids_bytes) >= GoalAchievingEndpoint.goals_per_desire_limit * 4:
             raise HTTPException(detail="Max number of goals created for specified desire", status_code=400)
 
-        GoalAchievingEndpoint.cursor.execute("INSERT INTO goals COLUMNS user_id, name, how_much, measuring_units, rrule_string  VALUES (%s, %s, %s, %s, %s);",
-                                             (goal.userId, goal.name, goal.howMuch, goal.measuringUnits, goal.rruleString))
+        GoalAchievingEndpoint.cursor.execute("INSERT INTO goals (user_id, name, how_much, measuring_units, rrule_string, create_todos, create_events)  VALUES (%s, %s, %s, %s, %s, %s, %s);",
+                                             (goal.userId, goal.name, goal.howMuch, goal.measuringUnits, goal.rruleString, goal.createTodos, goal.createEvents))
         goal_id = GoalAchievingEndpoint.cursor.lastrowid
-        goal_ids_bytes += goal_id.to_bytes(length=4, byteorder="big", signed=False)
+        goal_ids_bytes = BytesHelper.add_unsigned_int_to_bytes(goal_ids_bytes, goal_id)
         GoalAchievingEndpoint.cursor.execute("UPDATE goal_ids_by_desire SET goal_ids = %s WHERE desire_id = %s", (goal_ids_bytes, goal.desireId))
+        CalendarEventsEndpoint.add_recurrence(user_id, api_key, goal.rruleString, goal.createTodos, goal.createEvents)
         return {"message": "Goal created successfully", "goal_id": goal_id}, 200
 
     @staticmethod
     @router.get("/api/goals/{goal_id}")
-    def get_goals(user_id: int, api_key: str, goal_id: int):
+    def get_goal(user_id: int, api_key: str, goal_id: int):
         if not UsersEndpoint.authenticate(user_id, api_key):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
-        GoalAchievingEndpoint.cursor.execute("SELECT * FROM ")
+        GoalAchievingEndpoint.cursor.execute("SELECT * FROM goals WHERE goal_id = %s", goal_id.__str__())
+        if GoalAchievingEndpoint.cursor.rowcount == 0:
+            raise HTTPException(detail="No goal of specified id found", status_code=400)
+        goal_dict = json.loads(GoalAchievingEndpoint.cursor.fetchone().__str__())
+        if goal_dict["user_id"] != user_id:
+            raise  HTTPException(detail="User not authorized to access such object", status_code=401)
+        return goal_dict, 200
+
     @staticmethod
     @router.put("/api/goals/{goal_id}")
-    def update_goal(goal_id: int, updated_goal: dict):
-        if goal_id < len(goals):
-            goals[goal_id] = updated_goal
-            return {"message": f"Goal with ID {goal_id} updated successfully"}
-        raise HTTPException(status_code=404, detail="Goal not found")
+    def update_goal(user_id: int, api_key:str, goal_id: int, updated_goal: GoalAsParameter):
+        if not UsersEndpoint.authenticate(user_id, api_key):
+            raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
+        goal_dict = GoalAchievingEndpoint.get_goal(user_id, api_key, goal_id)[0]
+        if goal_dict["rrule_string"] != updated_goal.rruleString:
+            # TODO: make sure updating rrules are handled correctly without changing recurrence_ids
+            pass
+        GoalAchievingEndpoint.cursor.execute("UPDATE goals SET desire_id = %s, name = %s, how_much = %s, measuring_units = %s, rrule_string = %s, plan_id = %s WHERE goal_id = %s",
+                                             (updated_goal.desireId, updated_goal.name, updated_goal.howMuch, updated_goal.measuringUnits, updated_goal.rruleString, updated_goal.planId, goal_id))
+        return {"message": f"Goal with ID {goal_id} updated successfully"}, 200
 
     @staticmethod
     @router.delete("/api/goals/{goal_id}")
-    def delete_goal(goal_id: int):
-        if goal_id < len(goals):
-            del goals[goal_id]
-            return {"message": f"Goal with ID {goal_id} deleted successfully"}
-        raise HTTPException(status_code=404, detail="Goal not found")
+    def delete_goal(user_id: int, api_key: str, goal_id: int):
+        if not UsersEndpoint.authenticate(user_id, api_key):
+            raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
+        GoalAchievingEndpoint.cursor.execute("SELECT * FROM goals WHERE goal_id = %s", goal_id.__str__())
+        res = GoalAchievingEndpoint.cursor.fetchone()
+        if res is None:
+            raise HTTPException(status_code=404, detail="Goal not found")
+        if res["user_id"] != user_id:
+            raise HTTPException(detail="User not authorized to access such object", status_code=401)
+        desire_id = res["desire_id"]
+        GoalAchievingEndpoint.cursor.execute("SELECT * FROM goal_ids_by_desire WHERE desire_id = %s", desire_id)
+        goal_ids = GoalAchievingEndpoint.cursor.fetchone()["goal_ids"]
+        goal_ids = BytesHelper.remove_unsigned_int_from_bytes(goal_ids, goal_id)
+        if goal_ids is None:
+            print("ERROR: goal was deleted from goals database but could not be found in goal_ids_by_desire database. goal_id = %s", goal_id)
+            raise HTTPException(status_code=500, detail="We had an internal error, please try again later")
+
+        GoalAchievingEndpoint.cursor.execute("DELETE FROM goals WHERE goal_id = %s", goal_id)
+        return {"message": f"Goal with ID {goal_id} deleted successfully"}
 
     # PLANS ENDPOINTS
     @staticmethod
     @router.post("/api/plans")
-    def create_plan(plan: dict):
-        plans.append(plan)
-        return {"message": "Plan created successfully"}
+    def create_plan(user_id: int, api_key: str, plan: PlanAsParameter):
+        if not UsersEndpoint.authenticate(user_id, api_key):
+            raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
+        if user_id != plan.userId:
+            raise  HTTPException(detail="User not authorized to access this object", status_code=401)
+        GoalAchievingEndpoint.cursor.execute("INSERT INTO plans (user_id, goal_id, event_id, todo_id, plan_description, action_id) VALUES (%s, %s, %s, %s, %s, %s);",
+                                             (plan.userId, plan.goalId, plan.eventId, plan.todoId, plan.planDescription, plan.actionId))
+        plan_id = GoalAchievingEndpoint.cursor.lastrowid
+        return {"message": "Plan created successfully", "plan_id": plan_id}, 200
 
     @staticmethod
-    @router.get("/api/plans")
-    def get_plans():
-        return plans
+    @router.get("/api/plans/{plan_id}")
+    def get_plan(user_id: int, api_key: str, plan_id: int):
+        if not UsersEndpoint.authenticate(user_id, api_key):
+            raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
+        GoalAchievingEndpoint.cursor.execute("SELECT * FROM plans WHERE plan_id = %s", plan_id)
+        res = GoalAchievingEndpoint.cursor.fetchone()
+        if res is None:
+            raise HTTPException(detail="no such plan exists", status_code=400)
+        if user_id != res["user_id"]:
+            raise HTTPException(detail="User not authorized to access this object", status_code=401)
+        return res.__str__(), 200
 
     @staticmethod
     @router.put("/api/plans/{plan_id}")
-    def update_plan(plan_id: int, updated_plan: dict):
-        if plan_id < len(plans):
-            plans[plan_id] = updated_plan
-            return {"message": f"Plan with ID {plan_id} updated successfully"}
-        raise HTTPException(status_code=404, detail="Plan not found")
+    def update_plan(user_id: int, api_key: str, plan_id: int, updated_plan: PlanAsParameter):
+        plan_dict = json.loads(GoalAchievingEndpoint.get_plan(user_id, api_key, plan_id)[0])
+        if plan_dict["user_id"] != user_id:
+            raise HTTPException(detail="User not authorized to access this object", status_code=401)
+        GoalAchievingEndpoint.cursor.execute("UPADATE plans SET goal_id = %s, event_id = %s, todo_id = %s, plan_description = %s, action_id = %s WHERE goal_id = %s;",
+                                             (updated_plan.goalId, updated_plan.eventId, updated_plan.todoId, updated_plan.planDescription, updated_plan.actionId, updated_plan.goalId))
+        return  {"message": f"Plan with ID {plan_id} updated successfully"}, 200
 
     @staticmethod
     @router.delete("/api/plans/{plan_id}")
-    def delete_plan(plan_id: int):
-        if plan_id < len(plans):
-            del plans[plan_id]
-            return {"message": f"Plan with ID {plan_id} deleted successfully"}
-        raise HTTPException(status_code=404, detail="Plan not found")
+    def delete_plan(user_id: int, api_key:str, plan_id: int):
+        if not UsersEndpoint.authenticate(user_id, api_key):
+            raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
+        GoalAchievingEndpoint.get_plan(user_id, api_key, plan_id)
+        GoalAchievingEndpoint.cursor.execute("DELETE FROM plans WHERE plan_id = %s", plan_id)
+        return {"message": f"Plan with ID {plan_id} deleted successfully"}
 
     # ACTIONS ENDPOINT
     @staticmethod
     @router.post("/api/actions")
-    def create_action(action: dict):
-        actions.append(action)
-        return {"message": "Action created successfully"}
+    def create_action(user_id: int, api_key: str, action: ActionAsParameter):
+        if not UsersEndpoint.authenticate(user_id, api_key):
+            raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
+        if user_id != json.loads(GoalAchievingEndpoint.get_plan[0])["user_id"]:
+            raise HTTPException(detail="User not authorized to access this object", status_code=401)
+        GoalAchievingEndpoint.cursor.execute(
+            "INSERT INTO actions (event_id, plan_id, goal_id, successful, how_much_accomplished, notes) VALUES (%s, %s, %s, %s, %s, %s)",
+            (action.eventId, action.planId, action.goalId, action.successful, action.howMuchAccomplished, action.notes))
+        action_id = GoalAchievingEndpoint.cursor.lastrowid
+        return {"message": "Action created successfully", "action_id": action_id}, 200
 
     @staticmethod
-    @router.get("/api/actions")
-    def get_actions():
-        return actions
+    @router.get("/api/actions/{action_id}")
+    def get_action(user_id: int, api_key: str, action_id: int):
+        if not UsersEndpoint.authenticate(user_id, api_key):
+            raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
+        GoalAchievingEndpoint.cursor.execute("SELECT * FROM actions WHERE action_id = %s", action_id)
+        res = GoalAchievingEndpoint.cursor.fetchone()
+        if user_id != res["user_id"]:
+            raise HTTPException(detail="User not authorized to access this object", status_code=401)
+        return res.__str__(), 200
 
     @staticmethod
     @router.put("/api/actions/{action_id}")
-    def update_action(action_id: int, updated_action: dict):
-        if action_id < len(actions):
-            actions[action_id] = updated_action
-            return {"message": f"Action with ID {action_id} updated successfully"}
-        raise HTTPException(status_code=404, detail="Action not found")
+    def update_action(user_id: int, api_key: str, action_id: int, updated_action: ActionAsParameter):
+        action = json.loads(GoalAchievingEndpoint.get_action(user_id, api_key, action_id)[0])
+        GoalAchievingEndpoint.cursor.execute("UPDATE actions SET event_id = %s, plan_id = %s, goal_id = %s, successful = %s, how_much_accomplished = %s, notes = %s WHERE action_id = %s",
+                                             (updated_action.eventId, updated_action.planId, updated_action.goalId, updated_action.successful, updated_action.howMuchAccomplished, updated_action.notes, action_id))
+        return {"message": f"Action with ID {action_id} updated successfully"}
 
     @staticmethod
     @router.delete("/api/actions/{action_id}")
-    def delete_action(action_id: int):
-
+    def delete_action(user_id: int, api_key: str, action_id: int):
+        GoalAchievingEndpoint.get_action(user_id, api_key, action_id)
+        GoalAchievingEndpoint.cursor.execute("DELETE FROM actions WHERE action_id = %s", action_id)
+        return "success", 200

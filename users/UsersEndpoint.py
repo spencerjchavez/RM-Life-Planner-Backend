@@ -13,7 +13,6 @@ from mysql.connector import Error
 
 import Routes
 from users.UserAsParameter import UserAsParameter
-from users.User import User
 from calendar1.events.CalendarEventsEndpoint import CalendarEventsEndpoint
 
 router = APIRouter()
@@ -41,63 +40,56 @@ class UsersEndpoint:
 
     @staticmethod
     @router.post("/api/users/register")
-    def register_user(user_param: UserAsParameter):
+    def register_user(user: UserAsParameter):
         # check if username is in use
         # user = json.load(user, User)
-        if user_param.username is None:
+        if user.username is None:
             raise HTTPException(detail="Username too short", status_code=400)
-        if user_param.password is None:
+        if user.password is None:
             raise HTTPException(detail="Password too short", status_code=400)
-        if len(user_param.username) <= 3:
+        if len(user.username) <= 3:
             raise HTTPException(detail="Username too short", status_code=400)
-        if len(user_param.username) > 24:
+        if len(user.username) > 24:
             raise HTTPException(detail="Username must be 24 characters or less", status_code=400)
         exp = r'[^\w\s\$\#\&\!\?\@]'
-        if re.search(exp, user_param.username) is not None:
+        if re.search(exp, user.username) is not None:
             raise HTTPException(
                 detail="Username may only contain digits, letters, and these characters: !, ? @, #, $, &",
                 status_code=400)
-        if len(user_param.password) <= 7:
+        if len(user.password) <= 7:
             raise HTTPException(detail="Password too short", status_code=400)
-        if re.search(exp, user_param.password) is not None:
+        if re.search(exp, user.password) is not None:
             raise HTTPException(detail="Password may only contain digits, letters, and these characters: !, ? @, #, $, &", status_code=400)
-        if len(user_param.password) > 32:
-            raise HTTPException(detail="Password must be 36 characters or less", status_code=400)
+        if len(user.password) > 32:
+            raise HTTPException(detail="Password must be 32 characters or less", status_code=400)
 
         email_pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
-        if user_param.email is not None:
-            if re.match(email_pattern, user_param.email) is None:
+        if user.email is not None:
+            if re.match(email_pattern, user.email) is None:
                 raise HTTPException(detail="Must enter a valid email address!", status_code=400)
 
-        if UsersEndpoint.isUsernameInUse(user_param.username)["is_in_use"] ==\
+        if UsersEndpoint.isUsernameInUse(user.username)["is_in_use"] ==\
                 "True":
-            print(f"username {user_param.username} already exists")
+            print(f"username {user.username} already exists")
             raise HTTPException(detail="Username already in use", status_code=400)
-        # generate a unique user_id, of size int (4 bytes), with the 4th byte set to 10000000. user_id will be 10 digits long in base10
-        UsersEndpoint.users_cursor.execute("SELECT MAX(user_id) FROM users;")
-        user = User(username=user_param.username, email=user_param.email,
-                    google_calendar_id=user_param.google_calendar_id)
-        max_id = UsersEndpoint.users_cursor.fetchone()["MAX(user_id)"]
-        if max_id is None:
-            max_id = 0
-        user.user_id = max_id + 1
-        UsersEndpoint.users_cursor.execute(
-            f"INSERT INTO user_ids (user_id, username) VALUES (%s, %s);", (user.user_id.__str__(), user.username))
-
-        user.date_joined = int(time.time())
+        date_joined = int(time.time())
         # hash password
-        password = user_param.password
-        user.salt = bcrypt.gensalt()
-        user.hashed_password = bcrypt.hashpw(password.encode("utf-8"), user.salt)
+        password = user.password
+        salt = bcrypt.gensalt()
+        hashed_password = bcrypt.hashpw(password.encode("utf-8"), salt)
         # insert user into database
-        sql = "INSERT INTO users (username, hashed_password, user_id, email, date_joined, google_calendar_id, salt) VALUES (%s, %s, %s, %s, %s, %s, %s);"
-        UsersEndpoint.users_cursor.execute(sql,(user.username, user.hashed_password, user.user_id, user.email, user.date_joined, user.google_calendar_id, user.salt))
+        sql = "INSERT INTO users (username, hashed_password, email, date_joined, google_calendar_id, salt) VALUES (%s, %s, %s, %s, %s, %s);"
+        UsersEndpoint.users_cursor.execute(sql, (user.username, hashed_password, user.email, date_joined, user.google_calendar_id, salt))
 
-        login_res = UsersEndpoint.loginUser(user.username, password)
+        user_id = UsersEndpoint.users_cursor.lastrowid
+        UsersEndpoint.users_cursor.execute(
+            f"INSERT INTO user_ids (user_id, username) VALUES (%s, %s);", (user_id, user.username))
+
+        login_res = UsersEndpoint.login_user(user.username, password)
         if login_res[1] != 200:
             print("somethings wrong: user account created but could not be logged in")
             raise HTTPException(detail="user account created, but an internal error prevented it from being logged in!",
-                                status_code=400)
+                                status_code=500)
         return login_res
 
     @staticmethod
@@ -108,7 +100,7 @@ class UsersEndpoint:
 
     @staticmethod
     @router.post("/api/users/login")
-    def loginUser(username: str, password: str):
+    def login_user(username: str, password: str):
         UsersEndpoint.users_cursor.execute(f"SELECT * FROM user_ids WHERE username = %s;", (username,))
         res = UsersEndpoint.users_cursor.fetchone()
         if res is None:
@@ -126,30 +118,48 @@ class UsersEndpoint:
 
     @staticmethod
     @router.post("/api/users/logout")
-    def logoutUser(user_id: int, api_key: str):
+    def logout_user(user_id: int, api_key: str):
         if not authenticate(user_id, api_key):
             raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
         UsersEndpoint.api_keys_by_userId[user_id] = None
         return "User successfully logged out"
 
     @staticmethod
-    @router.get("/api/users")
-    def getUser(user_id: int, api_key: str):
+    @router.get("/api/users/")
+    def get_user(user_id: int, api_key: str):
         if not authenticate(user_id, api_key):
             raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
         UsersEndpoint.users_cursor.execute("SELECT * FROM users WHERE user_id = %s;", (user_id.__str__(),))
-        user = UsersEndpoint.users_cursor.fetchone().__str__()
+        user = UsersEndpoint.users_cursor.fetchone()
+        if user["user_id"] != user_id:
+            raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
+        # Don't return user's salt or hashed_password
+        user["salt"] = None
+        user["hashed_password"] = None
         return {"message": "successfully got user", "user": json.dumps(user)}, 200
 
     @staticmethod
-    @router.delete("/api/users")
+    @router.put("/api/users/")
+    def update_user(user_id: int, api_key: str, updated_user: UserAsParameter):
+        res = UsersEndpoint.get_user(user_id, api_key)
+        original_user: UserAsParameter = json.loads(res[0]["user"])
+        # make sure the user isn't changing any properties they aren't allowed to
+        if updated_user.username != original_user.username:
+            raise HTTPException(status_code=401, detail="User is not allowed to access this property")
+        UsersEndpoint.users_cursor.execute(f"UPDATE users SET (password = %s, email = %s, google_calendar_id = %s)", (updated_user.password, updated_user.email, updated_user.google_calendar_id))
+        return "successfully updated", 200
+
+    @staticmethod
+    @router.delete("/api/users/")
     def delete_user(user_id: int, api_key: str):
         if not authenticate(user_id, api_key):
             raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
         UsersEndpoint.users_cursor.execute(f"DELETE FROM users WHERE user_id = %s;", (user_id.__str__(),))
         UsersEndpoint.users_cursor.execute(f"DELETE FROM user_ids WHERE user_id = %s;", (user_id.__str__(),))
         try:
-            CalendarEventsEndpoint.delete_events_of_user(user_id, api_key)
+            pass
+            #TODO: UNCOMMENT THIS OUT WHEN ENDPOINT IS WORKING
+            # CalendarEventsEndpoint.delete_events_of_user(user_id, api_key)
         except HTTPException:
             print("Deleted user, but could not delete user events!")
             raise HTTPException(detail="internal error while deleting user", status_code=500)
