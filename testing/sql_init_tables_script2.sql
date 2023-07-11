@@ -1,12 +1,8 @@
 use users;
-drop table user_ids;
-create table user_ids (
-username varchar(24) primary key not null,
-user_id int unsigned not null);
 
 drop table users;
 create table users (
-user_id int unsigned primary key not null auto_increment,
+user_id int unsigned not null auto_increment,
 username varchar(24) not null,
 hashed_password tinyblob not null,
 date_joined int unsigned not null,
@@ -16,12 +12,22 @@ google_calendar_id varchar(84),
 next_event_id int unsigned not null, # to track what event_id the user's next event will have'
 events_owned int unsigned not null,
 next_todo_id int unsigned not null,
-todos_owned int unsigned not null); # same thing but for the next todo
+todos_owned int unsigned not null,
+primary key(user_id)); # same thing but for the next todo
+
+drop table user_ids;
+create table user_ids (
+username varchar(24) not null,
+user_id int unsigned not null,
+primary key(username),
+foreign key(user_id) references users(user_id),
+);
 
 use calendars;
 drop table events_by_user_event_id;
 create table events_by_user_event_id (
-key_id bigint unsigned primary key not null,  # first 4 bytes = user_id, last 4 bytes = event_id
+user_id unsigned int not null,
+event_id unsigned int not null,
 name varchar(64),
 description varchar(500),
 event_type int not null,
@@ -37,7 +43,10 @@ linked_goal_id int,
 linked_plan_id int,
 linked_action_id int,
 
-recurrence_id bigint unsigned);
+recurrence_id bigint unsigned,
+
+FOREIGN KEY user_id REFERENCES users(user_id),
+PRIMARY KEY (user_id, event_id));
 
 drop table events_by_user_day;
 create table events_by_user_day (

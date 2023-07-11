@@ -13,7 +13,7 @@ from goal_achieving.ActionAsParameter import ActionAsParameter
 from goal_achieving.DesireCategoryAsParameter import DesireCategoryAsParameter
 from users import UsersEndpoint
 from BytesHelper import BytesHelper
-from calendar1.events.CalendarEventsEndpoint import CalendarEventsEndpoint
+from calendar1.events.CalendarItemsEndpoint import CalendarEventsEndpoint
 
 router = APIRouter()
 
@@ -189,9 +189,10 @@ class GoalAchievingEndpoint:
         goal_dict = GoalAchievingEndpoint.get_goal(user_id, api_key, goal_id)[0]
         if goal_dict["rrule_string"] != updated_goal.rruleString:
             # TODO: make sure updating rrules are handled correctly without changing recurrence_ids
+            # Likely will handle this in the front-end
             pass
-        GoalAchievingEndpoint.cursor.execute("UPDATE goals SET desire_id = %s, name = %s, how_much = %s, measuring_units = %s, rrule_string = %s, plan_id = %s WHERE goal_id = %s",
-                                             (updated_goal.desireId, updated_goal.name, updated_goal.howMuch, updated_goal.measuringUnits, updated_goal.rruleString, updated_goal.planId, goal_id))
+        GoalAchievingEndpoint.cursor.execute("UPDATE goals SET name = %s, how_much = %s, measuring_units = %s, rrule_string = %s, plan_id = %s WHERE goal_id = %s",
+                                             (updated_goal.name, updated_goal.howMuch, updated_goal.measuringUnits, updated_goal.rruleString, updated_goal.planId, goal_id))
         return {"message": f"Goal with ID {goal_id} updated successfully"}, 200
 
     @staticmethod
@@ -217,7 +218,6 @@ class GoalAchievingEndpoint:
         return {"message": f"Goal with ID {goal_id} deleted successfully"}
 
     # PLANS ENDPOINTS
-    #TODO: UPDATE PLANASPARAMETER TO INCLUDE PLANNED QUANTITY / GOAL TO ACHIEVE
     @staticmethod
     @router.post("/api/plans")
     def create_plan(user_id: int, api_key: str, plan: PlanAsParameter):
@@ -225,8 +225,8 @@ class GoalAchievingEndpoint:
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         if user_id != plan.userId:
             raise  HTTPException(detail="User not authorized to access this object", status_code=401)
-        GoalAchievingEndpoint.cursor.execute("INSERT INTO plans (user_id, goal_id, event_id, todo_id, plan_description, action_id) VALUES (%s, %s, %s, %s, %s, %s);",
-                                             (plan.userId, plan.goalId, plan.eventId, plan.todoId, plan.planDescription, plan.actionId))
+        GoalAchievingEndpoint.cursor.execute("INSERT INTO plans (user_id, goal_id, event_id, todo_id, plan_description, action_id, how_much) VALUES (%s, %s, %s, %s, %s, %s, %s);",
+                                             (plan.userId, plan.goalId, plan.eventId, plan.todoId, plan.planDescription, plan.actionId, plan.howMuch))
         plan_id = GoalAchievingEndpoint.cursor.lastrowid
         return {"message": "Plan created successfully", "plan_id": plan_id}, 200
 
@@ -249,8 +249,8 @@ class GoalAchievingEndpoint:
         plan_dict = json.loads(GoalAchievingEndpoint.get_plan(user_id, api_key, plan_id)[0])
         if plan_dict["user_id"] != user_id:
             raise HTTPException(detail="User not authorized to access this object", status_code=401)
-        GoalAchievingEndpoint.cursor.execute("UPADATE plans SET goal_id = %s, event_id = %s, todo_id = %s, plan_description = %s, action_id = %s WHERE goal_id = %s;",
-                                             (updated_plan.goalId, updated_plan.eventId, updated_plan.todoId, updated_plan.planDescription, updated_plan.actionId, updated_plan.goalId))
+        GoalAchievingEndpoint.cursor.execute("UPADATE plans SET goal_id = %s, event_id = %s, todo_id = %s, plan_description = %s, action_id = %s, how_much = %s WHERE goal_id = %s;",
+                                             (updated_plan.goalId, updated_plan.eventId, updated_plan.todoId, updated_plan.planDescription, updated_plan.actionId, updated_plan.goalId, updated_plan.howMuch))
         return  {"message": f"Plan with ID {plan_id} updated successfully"}, 200
 
     @staticmethod

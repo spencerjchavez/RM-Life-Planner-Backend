@@ -13,7 +13,7 @@ from mysql.connector import Error
 
 import Routes
 from users.UserAsParameter import UserAsParameter
-from calendar1.events.CalendarEventsEndpoint import CalendarEventsEndpoint
+from calendar1.events.CalendarItemsEndpoint import CalendarEventsEndpoint
 
 router = APIRouter()
 

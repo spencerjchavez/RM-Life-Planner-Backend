@@ -10,3 +10,4 @@ class PlanAsParameter(BaseModel):
     todoId: Optional[int]
     planDescription: Optional[str]
     actionId: Optional[str]
+    howMuch: Optional[int]

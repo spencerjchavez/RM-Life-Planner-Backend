@@ -1,11 +1,12 @@
 # CREATED JUNE OF 2023 BY SPENCER CHAVEZ
+from datetime import datetime
 
 import uvicorn
 from dateutil.rrule import rrulestr
 from fastapi import FastAPI
 from mysql.connector.cursor import MySQLCursor
 from users.UsersEndpoint import router as users_router
-from calendar1.events.CalendarEventsEndpoint import router as calendar_events_router
+from calendar1.events.CalendarItemsEndpoint import router as calendar_events_router
 from goal_achieving.GoalAchievingEndpoint import router as goals_router
 
 
