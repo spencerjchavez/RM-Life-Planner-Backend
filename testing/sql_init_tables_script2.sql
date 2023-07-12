@@ -72,7 +72,7 @@ todo_ids varbinary(444));
 
 drop table recurrences;
 create table recurrences (
-recurrence_id bigint unsigned primary key not null auto_increment,
+recurrence_id bigint unsigned not null auto_increment,
 user_id int unsigned not null,
 recurrence_type int,
 rrule_string varchar(64) not null,
@@ -88,19 +88,12 @@ event_duration int not null,
 
 #recurrent todo stuff
 todo_name varchar(32),
-todo_timeframe int);
+todo_timeframe int,
 
-drop table recurrence_ids_by_user;
-create table recurrence_ids_by_user(
-user_id int unsigned primary key not null,
-recurrence_ids varbinary(8000));
+FOREIGN KEY user_id REFERENCES users(user_id),
+PRIMARY KEY recurrence_id);
 
-use goal_achieving;
-
-drop table desire_ids_by_user;
-create table desire_ids_by_user(
-user_id int unsigned primary key not null,
-desire_ids varbinary(200));
+CREATE INDEX user_id_index ON recurrences(user_id)
 
 drop table desires;
 create table desires(
@@ -113,12 +106,10 @@ priority_level int,
 color_r tinyint unsigned not null,
 color_g tinyint unsigned not null,
 color_b tinyint unsigned not null,
-related_goal_ids varbinary(80));
+related_goal_ids varbinary(80),
+FOREIGN KEY user_id REFERENCES users(user_id));
 
-drop table goal_ids_by_desire;
-create table goal_ids_by_desire(
-desire_id int unsigned primary key not null,
-goal_ids varbinary(80)); # max 20 goals per desire
+CREATE INDEX user_id_index ON desires(user_id);
 
 drop table goals;
 create table goals(
@@ -129,29 +120,48 @@ name varchar(42) not null,
 how_much int,
 measuring_units varchar(12),
 
-# if is recurring goal
-rrule_string varchar(64),
+is_recurring bool not null,
+# if is_recurring
 recurrence_id bigint unsigned,
-# if one-time goal
-plan_id bigint unsigned);
+
+FOREIGN KEY recurrence_id REFERENCES recurrences(recurrence_id),
+FOREIGN desire_id REFERENCES desires(desire_id),
+FOREIGN KEY user_id REFERENCES users(user_id),
+);
+
+CREATE INDEX desire_id_index ON goals(desire_id)
 
 drop table plans;
 create table plans(
 plan_id bigint unsigned primary key not null auto_increment,
 user_id int unsigned not null,
-goal_id int unsigned,
+goal_id int unsigned not null,
 event_id int unsigned not null,
-todo_id int unsigned,
-plan_description varchar(500), # same as the event description
-action_id bigint unsigned,
-how_much int);
+how_much int,
+# plan_description varchar(500), # same as the event description
+
+
+FOREIGN KEY user_id REFERENCES users(user_id),
+FOREIGN KEY goal_id REFERENCES goals(goal_id),
+FOREIGN KEY event_id REFERENCES events(event_id));
+
+CREATE INDEX goal_id_index ON plans(goal_id);
+CREATE INDEX event_id_index ON plans(event_id);
 
 drop table actions;
 create table actions(
-action_id bigint unsigned primary key not null auto_increment,
+plan_id bigint unsigned primary key not null,
 event_id int unsigned not null,
-plan_id bigint unsigned not null,
 goal_id int unsigned not null,
+user_id int unsigned not null,
 successful int,
-how_much_accompished int,
-notes varchar(1000));
+how_much_accomplished int,
+notes varchar(1000),
+
+FOREIGN KEY user_id REFERENCES users(user_id),
+FOREIGN KEY plan_id REFERENCES plans (plan_id),
+FOREIGN KEY goal_id REFERENCES goals(goal_id),
+FOREIGN KEY event_id REFERENCES events(event_id));
+
+CREATE INDEX user_id_index ON actions(user_id);
+CREATE INDEX event_id_index ON actions(event_id);
