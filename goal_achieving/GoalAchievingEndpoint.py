@@ -6,11 +6,10 @@ from enum import Enum
 import mysql.connector
 from mysql.connector import Error
 from fastapi import APIRouter, HTTPException
-from goal_achieving.DesireAsParameter import DesireAsParameter
+from goal_achieving.Desire import DesireAsParameter
 from goal_achieving.PlanAsParameter import PlanAsParameter
 from goal_achieving.GoalAsParameter import GoalAsParameter
 from goal_achieving.ActionAsParameter import ActionAsParameter
-from goal_achieving.DesireCategoryAsParameter import DesireCategoryAsParameter
 from users import UsersEndpoint
 from BytesHelper import BytesHelper
 from calendar1.events.CalendarItemsEndpoint import CalendarEventsEndpoint

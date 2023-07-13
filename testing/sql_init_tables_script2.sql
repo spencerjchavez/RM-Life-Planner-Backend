@@ -20,9 +20,7 @@ hashed_password tinyblob not null,
 date_joined int unsigned not null,
 salt tinyblob not null,
 email varchar(32),
-google_calendar_id varchar(84),
-events_owned int unsigned not null,
-next_todo_id int unsigned not null);
+google_calendar_id varchar(84));
 
 CREATE UNIQUE INDEX username_index ON users(username);
 
@@ -66,7 +64,7 @@ create table desires(
 desire_id int unsigned not null primary key auto_increment,
 name varchar(42) not null,
 user_id int unsigned not null,
-deadline_date bigint unsigned,
+deadline int unsigned,
 priority_level int,
 color_r tinyint unsigned not null,
 color_g tinyint unsigned not null,

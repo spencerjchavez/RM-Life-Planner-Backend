@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException
 import mysql.connector
 from mysql.connector import Error
 from BytesHelper import BytesHelper
-from calendar1.events.RecurrenceAsParameter import RecurrenceAsParameter
+from calendar1.events.Recurrence import RecurrenceAsParameter
 from calendar1.events.CalendarEventAsParameter import CalendarEventAsParameter
 from calendar1.events.ToDoAsParameter import ToDoAsParameter
 from users import UsersEndpoint

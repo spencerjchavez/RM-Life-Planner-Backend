@@ -1,19 +1,15 @@
 import json
 import random
-import secrets
 import string
 import time
 import re
 
 import bcrypt
-from fastapi import APIRouter, HTTPException, Form
-from fastapi.responses import Response
+from fastapi import APIRouter, HTTPException
 import mysql.connector
 from mysql.connector import Error
 
-import Routes
-from users.UserAsParameter import UserAsParameter
-from calendar1.events.CalendarItemsEndpoint import CalendarEventsEndpoint
+from users.User import UserAsParameter
 
 router = APIRouter()
 
