@@ -1,5 +1,6 @@
+from typing import Optional
 from pydantic import BaseModel
-from pydantic.config import Optional
+
 
 class Recurrence(BaseModel):
     recurrenceId: Optional[int]

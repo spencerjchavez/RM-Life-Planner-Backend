@@ -5,15 +5,16 @@ from pydantic import BaseModel
 from pydantic.class_validators import Optional
 
 
-class ToDoAsParameter(BaseModel):
-    name: Optional[str]
-    endInstant: Optional[float]
-    startDay: Optional[float]
-    recurrenceId: Optional[int]
+class ToDo(BaseModel):
+    toDoId: Optional[str]
     userId: Optional[int]
-    goalId: Optional[int]
-    planId: Optional[int]
-    actionId: Optional[int]
+
+    name: Optional[str]
+    timeframe: Optional[int]
+    startInstant: Optional[float]
+
+    recurrenceId: Optional[int]
+    linkedGoalId: Optional[int]
 
     def __init__(self, vals: Dict[str, str]):
         super().__init__()

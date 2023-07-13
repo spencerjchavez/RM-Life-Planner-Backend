@@ -4,6 +4,7 @@ drop table actions;
 drop table plans;
 drop table todos_in_day;
 drop table todos;
+drop table alerts;
 drop table events_in_day;
 drop table events;
 drop table goals;
@@ -17,7 +18,7 @@ create table users (
 user_id int unsigned not null primary key auto_increment,
 username varchar(24) not null,
 hashed_password tinyblob not null,
-date_joined int unsigned not null,
+date_joined bigint not null,
 salt tinyblob not null,
 email varchar(32),
 google_calendar_id varchar(84));
@@ -40,7 +41,7 @@ recurrence_id bigint unsigned not null primary key auto_increment,
 user_id int unsigned not null,
 recurrence_type int,
 rrule_string varchar(64) not null,
-start_instant int unsigned not null,
+start_instant bigint not null,
 
 -- recurrent event stuff
 event_type int not null,
@@ -64,7 +65,7 @@ create table desires(
 desire_id int unsigned not null primary key auto_increment,
 name varchar(42) not null,
 user_id int unsigned not null,
-deadline int unsigned,
+deadline bigint,
 priority_level int,
 color_r tinyint unsigned not null,
 color_g tinyint unsigned not null,
@@ -80,8 +81,8 @@ user_id int unsigned not null,
 name varchar(42) not null,
 how_much int,
 measuring_units varchar(12),
-start_instant int unsigned not null,
-end_instant int unsigned, -- null == goal is indefinite. This parameter is overridden by timeframe in recurring goals
+start_instant bigint not null,
+end_instant bigint, -- null == goal is indefinite. This parameter is overridden by timeframe in recurring goals
 -- recurring goal stuff
 recurrence_id bigint unsigned,
 timeframe int, -- can be a day, a week, or a month in length, depending on rrule
@@ -99,23 +100,22 @@ user_id int unsigned not null,
 name varchar(64),
 description varchar(500),
 event_type int not null,
-start_instant int unsigned not null,
-end_instant int unsigned not null,
+start_instant bigint not null,
+end_instant bigint not null,
 duration int not null,
 -- start_day int unsigned not null,
 -- end_day int unsigned not null,
-
-reminders varbinary(24),  -- up to 3 reminders per event in epoch seconds
 
 linked_goal_id bigint unsigned,
 recurrence_id bigint unsigned,
 
 FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
 FOREIGN KEY (linked_goal_id) REFERENCES goals(goal_id),
-FOREIGN KEY (recurrence_id) REFERENCES recurrences(recurrence_id));
+FOREIGN KEY (recurrence_id) REFERENCES recurrences(recurrence_id),
+FOREIGN KEY (alert_id) REFERENCES alerts(alert_id));
 
 create table events_in_day(
-day int unsigned not null,
+day bigint not null,
 event_id bigint unsigned not null,
 user_id int unsigned not null,
 
@@ -125,13 +125,20 @@ PRIMARY KEY (day, event_id));
 
 CREATE INDEX day_user_index ON events_in_day (day, user_id);
 
+create table alerts(
+event_id bigint unsigned not null,
+when int unsigned not null, -- when the alert should sound
+
+FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE,
+PRIMARY KEY (event_id, when));
+
 create table todos(
 todo_id bigint unsigned primary key not null auto_increment,
 user_id int unsigned not null,
 
 name varchar(32),
 timeframe int not null, -- todos can either span a day, week, or month. timeframe specifies this
-start_instant int unsigned not null,
+start_instant bigint not null,
 
 recurrence_id bigint unsigned,
 linked_goal_id bigint unsigned,
@@ -141,7 +148,7 @@ FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
 FOREIGN KEY (recurrence_id) REFERENCES recurrences(recurrence_id));
 
 create table todos_in_day(
-day int unsigned not null,
+day bigint not null,
 todo_id bigint unsigned not null,
 user_id int unsigned not null,
 

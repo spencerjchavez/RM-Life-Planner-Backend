@@ -1,17 +1,15 @@
 import json
 import random
-import secrets
 import string
 import time
 import re
 
 import bcrypt
-from fastapi import APIRouter, HTTPException, Form
-from fastapi.responses import Response
+from fastapi import APIRouter, HTTPException
 import mysql.connector
 from mysql.connector import Error
 
-from users.User import UserAsParameter
+from models.User import UserAsParameter
 
 router = APIRouter()
 
@@ -24,7 +22,7 @@ class UsersEndpoint:
 
         google_db_connection = mysql.connector.connect(
             host='34.31.57.31',
-            database='users',
+            database='database1',
             user='root',
             password='supersecretdatabase$$keepout',
             autocommit=True

@@ -4,13 +4,16 @@ from pydantic import BaseModel
 from pydantic.class_validators import Optional
 
 
-class GoalAsParameter(BaseModel):
+class Goal(BaseModel):
+    goalId: Optional[int]
     userId: Optional[int]
     desireId: Optional[int]
     planId: Optional[int]  # not included in post calls
     name: Optional[str]
     howMuch: Optional[int]
     measuringUnits: Optional[str]
-    rruleString: Optional[str]
-    createTodos: Optional[bool]
-    createEvents: Optional[bool]
+    startInstant: Optional[str]
+    endInstant: Optional[str] # null == goal is indefinite. This parameter is overridden by timeframe in recurring goals
+    # recurring goal stuff
+    recurrenceId: Optional[int]
+    timeframe: Optional[int]

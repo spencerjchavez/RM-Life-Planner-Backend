@@ -7,10 +7,10 @@ from fastapi import APIRouter, HTTPException
 import mysql.connector
 from mysql.connector import Error
 from BytesHelper import BytesHelper
-from calendar1.events.Recurrence import RecurrenceAsParameter
-from calendar1.events.CalendarEventAsParameter import CalendarEventAsParameter
-from calendar1.events.ToDoAsParameter import ToDoAsParameter
-from users import UsersEndpoint
+from models.Recurrence import RecurrenceAsParameter
+from models.CalendarEvent import CalendarEventAsParameter
+from models.ToDo import ToDoAsParameter
+from endpoints import UserEndpoints
 from dateutil.rrule import rrulestr, rrule
 from dateutil.relativedelta import relativedelta
 
@@ -39,7 +39,7 @@ class CalendarItemsEndpoint:
     try:
         google_db_connection = mysql.connector.connect(
             host='34.31.57.31',
-            database='calendars',
+            database='database1',
             user='root',
             password='supersecretdatabase$$keepout',
             autocommit=True
@@ -262,6 +262,13 @@ class CalendarItemsEndpoint:
         CalendarItemsEndpoint.cursor.execute(
             f"DELETE FROM events_by_user_day WHERE key_id BETWEEN %s AND %s;", (user_id.__str__() + "000000000", (user_id+1).__str__() + "000000000"))
         return "successfully deleted user_id + " + user_id.__str__() + "!!", 200
+
+
+
+
+
+
+
 
     @staticmethod
     def get_month_year_from_datetime(dt: datetime):

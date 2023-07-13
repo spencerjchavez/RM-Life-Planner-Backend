@@ -2,9 +2,9 @@
 
 import uvicorn
 from fastapi import FastAPI
-from users.UsersEndpoint import router as users_router
-from calendar1.events.CalendarItemsEndpoint import router as calendar_events_router
-from goal_achieving.GoalAchievingEndpoint import router as goals_router
+from endpoints.UserEndpoints import router as users_router
+from endpoints.CalendarItemsEndpoint import router as calendar_events_router
+from endpoints.GoalAchievingEndpoints import router as goals_router
 
 
 class Routes:

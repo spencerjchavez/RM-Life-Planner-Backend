@@ -6,13 +6,13 @@ from enum import Enum
 import mysql.connector
 from mysql.connector import Error
 from fastapi import APIRouter, HTTPException
-from goal_achieving.Desire import DesireAsParameter
-from goal_achieving.PlanAsParameter import PlanAsParameter
-from goal_achieving.GoalAsParameter import GoalAsParameter
-from goal_achieving.ActionAsParameter import ActionAsParameter
-from users import UsersEndpoint
+from models.Desire import DesireAsParameter
+from models.Plan import PlanAsParameter
+from models.Goal import GoalAsParameter
+from models.Action import ActionAsParameter
+from endpoints import UserEndpoints
 from BytesHelper import BytesHelper
-from calendar1.events.CalendarItemsEndpoint import CalendarEventsEndpoint
+from endpoints.CalendarItemsEndpoint import CalendarEventsEndpoint
 
 router = APIRouter()
 
@@ -43,7 +43,7 @@ class GoalAchievingEndpoint:
     try:
         google_db_connection = mysql.connector.connect(
             host='34.31.57.31',
-            database='goal_achieving',
+            database='database1',
             user='root',
             password='supersecretdatabase$$keepout',
             autocommit=True
