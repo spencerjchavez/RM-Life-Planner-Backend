@@ -6,13 +6,12 @@ from enum import Enum
 import mysql.connector
 from mysql.connector import Error
 from fastapi import APIRouter, HTTPException
-from models.Desire import DesireAsParameter
-from models.Plan import PlanAsParameter
-from models.Goal import GoalAsParameter
-from models.Action import ActionAsParameter
+from models.Desire import Desire
+from models.Plan import Plan
+from models.Goal import Goal
+from models.Action import Action
 from endpoints import UserEndpoints
-from BytesHelper import BytesHelper
-from endpoints.CalendarItemsEndpoint import CalendarEventsEndpoint
+from endpoints.CalendarItemsEndpoint import CalendarItemsEndpoint
 
 router = APIRouter()
 
@@ -58,8 +57,8 @@ class GoalAchievingEndpoint:
     # DESIRE ENDPOINTS
     @staticmethod
     @router.post("/api/desires")
-    def create_desire(user_id: int, api_key: str, desire: DesireAsParameter):
-        if not UsersEndpoint.authenticate(user_id, api_key):
+    def create_desire(user_id: int, api_key: str, desire: Desire):
+        if not UserEndpoints.authenticate(user_id, api_key):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         if user_id != desire.user_id:
             raise HTTPException(detail="bruh are you seriously trying to troll me rn? #nicetry #reported #getrekt", status_code=401)
@@ -91,7 +90,7 @@ class GoalAchievingEndpoint:
     @staticmethod
     @router.get("/api/desires/{desire_id}")
     def get_desire(user_id: int, api_key: str, desire_id: int):
-        if not UsersEndpoint.authenticate(user_id, api_key):
+        if not UserEndpoints.authenticate(user_id, api_key):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         GoalAchievingEndpoint.cursor.execute("SELECT * FROM desires WHERE desire_id = %s", desire_id.__str__())
         desire_dict = GoalAchievingEndpoint.cursor.fetchone().__dict__
@@ -101,8 +100,8 @@ class GoalAchievingEndpoint:
 
     @staticmethod
     @router.put("/api/desires/{desire_id}")
-    def update_desire(user_id: int, api_key: str, desire_id: int, updated_desire: DesireAsParameter):
-        if not UsersEndpoint.authenticate(user_id, api_key):
+    def update_desire(user_id: int, api_key: str, desire_id: int, updated_desire: Desire):
+        if not UserEndpoints.authenticate(user_id, api_key):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         res = GoalAchievingEndpoint.get_desire(desire_id)
         if res[1] != 200:
@@ -119,7 +118,7 @@ class GoalAchievingEndpoint:
     @staticmethod
     @router.delete("/api/desires/{desire_id}")
     def delete_desire(user_id: int, api_key: str, desire_id: int):
-        if not UsersEndpoint.authenticate(user_id, api_key):
+        if not UserEndpoints.authenticate(user_id, api_key):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         GoalAchievingEndpoint.cursor.execute("SELECT * FROM desires WHERE desire_id = %s", desire_id)
         if GoalAchievingEndpoint.cursor.rowcount == 0:
@@ -142,8 +141,8 @@ class GoalAchievingEndpoint:
     # GOALS ENDPOINTS
     @staticmethod
     @router.post("/api/goals")
-    def create_goal(user_id: int, api_key: str, goal: GoalAsParameter):
-        if not UsersEndpoint.authenticate(user_id, api_key):
+    def create_goal(user_id: int, api_key: str, goal: Goal):
+        if not UserEndpoints.authenticate(user_id, api_key):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         if user_id != goal.userId:
             print("ALERT ALERT ALERT: GoalAchievingEndpoint create-goal user ids didn't match: %s and %s", (user_id, goal.userId))
@@ -170,7 +169,7 @@ class GoalAchievingEndpoint:
     @staticmethod
     @router.get("/api/goals/{goal_id}")
     def get_goal(user_id: int, api_key: str, goal_id: int):
-        if not UsersEndpoint.authenticate(user_id, api_key):
+        if not UserEndpoints.authenticate(user_id, api_key):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         GoalAchievingEndpoint.cursor.execute("SELECT * FROM goals WHERE goal_id = %s", goal_id.__str__())
         if GoalAchievingEndpoint.cursor.rowcount == 0:
@@ -182,8 +181,8 @@ class GoalAchievingEndpoint:
 
     @staticmethod
     @router.put("/api/goals/{goal_id}")
-    def update_goal(user_id: int, api_key:str, goal_id: int, updated_goal: GoalAsParameter):
-        if not UsersEndpoint.authenticate(user_id, api_key):
+    def update_goal(user_id: int, api_key:str, goal_id: int, updated_goal: Goal):
+        if not UserEndpoints.authenticate(user_id, api_key):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         goal_dict = GoalAchievingEndpoint.get_goal(user_id, api_key, goal_id)[0]
         if goal_dict["rrule_string"] != updated_goal.rruleString:
@@ -197,7 +196,7 @@ class GoalAchievingEndpoint:
     @staticmethod
     @router.delete("/api/goals/{goal_id}")
     def delete_goal(user_id: int, api_key: str, goal_id: int):
-        if not UsersEndpoint.authenticate(user_id, api_key):
+        if not UserEndpoints.authenticate(user_id, api_key):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         GoalAchievingEndpoint.cursor.execute("SELECT * FROM goals WHERE goal_id = %s", goal_id.__str__())
         res = GoalAchievingEndpoint.cursor.fetchone()
@@ -219,8 +218,8 @@ class GoalAchievingEndpoint:
     # PLANS ENDPOINTS
     @staticmethod
     @router.post("/api/plans")
-    def create_plan(user_id: int, api_key: str, plan: PlanAsParameter):
-        if not UsersEndpoint.authenticate(user_id, api_key):
+    def create_plan(user_id: int, api_key: str, plan: Plan):
+        if not UserEndpoints.authenticate(user_id, api_key):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         if user_id != plan.userId:
             raise  HTTPException(detail="User not authorized to access this object", status_code=401)
@@ -232,7 +231,7 @@ class GoalAchievingEndpoint:
     @staticmethod
     @router.get("/api/plans/{plan_id}")
     def get_plan(user_id: int, api_key: str, plan_id: int):
-        if not UsersEndpoint.authenticate(user_id, api_key):
+        if not UserEndpoints.authenticate(user_id, api_key):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         GoalAchievingEndpoint.cursor.execute("SELECT * FROM plans WHERE plan_id = %s", plan_id)
         res = GoalAchievingEndpoint.cursor.fetchone()
@@ -244,7 +243,7 @@ class GoalAchievingEndpoint:
 
     @staticmethod
     @router.put("/api/plans/{plan_id}")
-    def update_plan(user_id: int, api_key: str, plan_id: int, updated_plan: PlanAsParameter):
+    def update_plan(user_id: int, api_key: str, plan_id: int, updated_plan: Plan):
         plan_dict = json.loads(GoalAchievingEndpoint.get_plan(user_id, api_key, plan_id)[0])
         if plan_dict["user_id"] != user_id:
             raise HTTPException(detail="User not authorized to access this object", status_code=401)
@@ -255,7 +254,7 @@ class GoalAchievingEndpoint:
     @staticmethod
     @router.delete("/api/plans/{plan_id}")
     def delete_plan(user_id: int, api_key:str, plan_id: int):
-        if not UsersEndpoint.authenticate(user_id, api_key):
+        if not UserEndpoints.authenticate(user_id, api_key):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         GoalAchievingEndpoint.get_plan(user_id, api_key, plan_id)
         GoalAchievingEndpoint.cursor.execute("DELETE FROM plans WHERE plan_id = %s", plan_id)
@@ -264,8 +263,8 @@ class GoalAchievingEndpoint:
     # ACTIONS ENDPOINT
     @staticmethod
     @router.post("/api/actions")
-    def create_action(user_id: int, api_key: str, action: ActionAsParameter):
-        if not UsersEndpoint.authenticate(user_id, api_key):
+    def create_action(user_id: int, api_key: str, action: Action):
+        if not UserEndpoints.authenticate(user_id, api_key):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         if user_id != json.loads(GoalAchievingEndpoint.get_plan[0])["user_id"]:
             raise HTTPException(detail="User not authorized to access this object", status_code=401)
@@ -278,7 +277,7 @@ class GoalAchievingEndpoint:
     @staticmethod
     @router.get("/api/actions/{action_id}")
     def get_action(user_id: int, api_key: str, action_id: int):
-        if not UsersEndpoint.authenticate(user_id, api_key):
+        if not UserEndpoints.authenticate(user_id, api_key):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         GoalAchievingEndpoint.cursor.execute("SELECT * FROM actions WHERE action_id = %s", action_id)
         res = GoalAchievingEndpoint.cursor.fetchone()
@@ -288,7 +287,7 @@ class GoalAchievingEndpoint:
 
     @staticmethod
     @router.put("/api/actions/{action_id}")
-    def update_action(user_id: int, api_key: str, action_id: int, updated_action: ActionAsParameter):
+    def update_action(user_id: int, api_key: str, action_id: int, updated_action: Action):
         action = json.loads(GoalAchievingEndpoint.get_action(user_id, api_key, action_id)[0])
         GoalAchievingEndpoint.cursor.execute("UPDATE actions SET event_id = %s, plan_id = %s, goal_id = %s, successful = %s, how_much_accomplished = %s, notes = %s WHERE action_id = %s",
                                              (updated_action.eventId, updated_action.planId, updated_action.goalId, updated_action.successful, updated_action.howMuchAccomplished, updated_action.notes, action_id))

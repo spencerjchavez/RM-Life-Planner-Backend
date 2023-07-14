@@ -4,6 +4,9 @@ import json
 from random import random
 import requests
 from requests import Response
+from endpoints.RecurrenceEndpoints import RecurrenceEndpoints
+
+from models.Recurrence import Recurrence
 
 def compare_responses(response_actual: Response, status_code_expected: int = 200, content_expected: str = None):
     if response_actual.status_code != status_code_expected:
@@ -30,6 +33,11 @@ if __name__ == '__main__':
     with open('users.json', 'r') as file:
         ulist = json.load(file)
         sample_users = ulist
+
+   # recurrence = Recurrence(userId=1)
+    #id = RecurrenceEndpoints.create_recurrence(recurrence)
+   # print(RecurrenceEndpoints.get_recurrence(id))
+
 
     # test register endpoint
     res = requests.post(register_url, data=json.dumps(sample_users["user1"]))

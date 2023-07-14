@@ -39,13 +39,12 @@ CREATE INDEX user_id_index ON months_accessed_by_user(user_id);
 create table recurrences (
 recurrence_id bigint unsigned not null primary key auto_increment,
 user_id int unsigned not null,
-recurrence_type int,
 rrule_string varchar(64) not null,
 start_instant bigint not null,
 
 -- recurrent event stuff
-event_type int not null,
 event_name varchar(64),
+event_type int not null,
 event_description varchar(500),
 event_duration int not null,
 

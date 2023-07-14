@@ -1,8 +1,6 @@
 # CREATED JUNE OF 2023 BY SPENCER CHAVEZ
-from typing import Any, Dict
-
+from typing import Any, Dict, Optional
 from pydantic import BaseModel
-from pydantic.class_validators import Optional
 
 
 class ToDo(BaseModel):

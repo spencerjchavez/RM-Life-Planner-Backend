@@ -1,7 +1,6 @@
 # CREATED JUNE OF 2023 BY SPENCER CHAVEZ
-
+from typing import Optional
 from pydantic import BaseModel
-from pydantic.class_validators import Optional
 
 
 class Action(BaseModel):

@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from endpoints.UserEndpoints import router as users_router
 from endpoints.CalendarItemsEndpoint import router as calendar_events_router
 from endpoints.GoalAchievingEndpoints import router as goals_router
-
+from endpoints.RecurrenceEndpoints import RecurrenceEndpoints
 
 class Routes:
     def __init__(self):
@@ -13,4 +13,7 @@ class Routes:
         app.include_router(users_router)
         app.include_router(calendar_events_router)
         app.include_router(goals_router)
+        app.include_router(RecurrenceEndpoints.router)
+        # todo: add other routers
+
         uvicorn.run(app, host="localhost", port=8000)

@@ -1,25 +1,41 @@
-from typing import Optional
+from typing import Optional, Any
 from pydantic import BaseModel
 
 
 class Recurrence(BaseModel):
-    recurrenceId: Optional[int]
-    userId: Optional[int]
-    recurrenceType: Optional[int]
-    rruleString: Optional[str]
-    startInstant: Optional[float]
+    recurrenceId: Optional[int] = None
+    userId: Optional[int] = None
+    recurrenceType: Optional[int] = None
+    rruleString: Optional[str] = None
+    startInstant: Optional[float] = None
 
-    recurrenceType: Optional[int]
+    eventName: Optional[str] = None
+    eventType: Optional[int] = None
+    eventDescription: Optional[str] = None
+    eventDuration: Optional[int] = None
 
-    todoName: Optional[str]
-    todoTimeframe: Optional[int]
+    todoName: Optional[str] = None
+    todoTimeframe: Optional[int] = None
 
-    eventType: Optional[int]
-    eventName: Optional[str]
-    eventDescription: Optional[str]
-    eventDuration: Optional[int]
+    goalName: Optional[str] = None
+    goalHowMuch: Optional[int] = None
+    goalMeasuringUnits: Optional[str] = None
+    goalTimeframe: Optional[int] = None
 
-    goalName: Optional[str]
-    goalHowMuch: Optional[int]
-    goalMeasuringUnits: Optional[str]
-    goalTimeframe: Optional[int]
+    def get_sql_insert_query(self):
+        return "INSERT INTO recurrences (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);", \
+            (self.userId,
+             self.rruleString,
+             self.startInstant,
+             self.eventName,
+             self.eventType,
+             self.eventDescription,
+             self.eventDuration,
+
+             self.todoName,
+             self.todoTimeframe,
+
+             self.goalName,
+             self.goalHowMuch,
+             self.goalMeasuringUnits,
+             self.todoTimeframe)
