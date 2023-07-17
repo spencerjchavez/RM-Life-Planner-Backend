@@ -4,13 +4,12 @@ from pydantic import BaseModel
 
 class Recurrence(BaseModel):
     recurrenceId: Optional[int] = None
+    seriesId: Optional[int] = None
     userId: Optional[int] = None
-    recurrenceType: Optional[int] = None
     rruleString: Optional[str] = None
     startInstant: Optional[float] = None
 
     eventName: Optional[str] = None
-    eventType: Optional[int] = None
     eventDescription: Optional[str] = None
     eventDuration: Optional[int] = None
 
@@ -18,17 +17,21 @@ class Recurrence(BaseModel):
     todoTimeframe: Optional[int] = None
 
     goalName: Optional[str] = None
+    goalDesireId: Optional[int] = None
     goalHowMuch: Optional[int] = None
     goalMeasuringUnits: Optional[str] = None
     goalTimeframe: Optional[int] = None
 
     def get_sql_insert_query(self):
-        return "INSERT INTO recurrences (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);", \
-            (self.userId,
+        return "INSERT INTO recurrences (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
+
+    def get_sql_insert_params(self):
+        return (self.userId,
+             self.seriesId,
              self.rruleString,
              self.startInstant,
+
              self.eventName,
-             self.eventType,
              self.eventDescription,
              self.eventDuration,
 
@@ -36,6 +39,7 @@ class Recurrence(BaseModel):
              self.todoTimeframe,
 
              self.goalName,
+             self.goalDesireId,
              self.goalHowMuch,
              self.goalMeasuringUnits,
              self.todoTimeframe)

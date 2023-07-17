@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from typing import Annotated, Optional
+
+from fastapi import APIRouter, HTTPException, Query
 import mysql.connector
 from mysql.connector import Error
 
@@ -25,24 +27,24 @@ class AlertEndpoints:
     @staticmethod
     @router.post("/api/alerts")
     def create_alert(event_id: int, when: float):
-        pass
+        return 200
 
     @staticmethod
     @router.get("/api/alerts/{event_id}")
     def get_alerts(event_id: int):
-        pass
+        return 200
 
     @staticmethod
     @router.put("/api/alerts/{event_id}")
-    def update_alerts(event_id: int, times: [float]):
-        pass
+    def update_alerts(event_id: int, times: Annotated[Optional[list[float]], Query()]):
+        return 200
 
     @staticmethod
     @router.delete("/api/alerts/{event_id}")
     def delete_alert(event_id: int, time: float):
-        pass
+        return 200
 
     @staticmethod
     @router.delete("/api/alerts/{event_id}")
     def delete_alerts(event_id: int):  # delete all alerts with event_id
-        pass
+        return 200

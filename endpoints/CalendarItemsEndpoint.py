@@ -7,215 +7,27 @@ from fastapi import APIRouter, HTTPException
 import mysql.connector
 from mysql.connector import Error
 from models.Recurrence import Recurrence
+from models.Authentication import Authentication
 from models.CalendarEvent import CalendarEvent
 from models.ToDo import ToDo
 from endpoints import UserEndpoints
 from dateutil.rrule import rrulestr, rrule
 from dateutil.relativedelta import relativedelta
 
-router = APIRouter()
 
-# TODO: i'm pretty sure therew ill be issues with retrieving and working with unsinged ints from the database, as python does not store them as unsigned, so byte conversion will likely be wrong
 
 class CalendarItemsEndpoint:
-    RECURRENT_EVENT_LIMIT = 5000  # number of events that can be attached to one recurrence_id
-    USER_RECURRENT_LIMIT = 500  # number of recurrent_ids that can be attached to each user
-    MONTHYEAR_BUFFER_LIMIT = 1080 # max number of monthyears that can be buffered for a single event
-    USER_EVENT_LIMIT = 4,294,967,295
-    USER_TODO_LIMIT = USER_EVENT_LIMIT
+
+
     MEASURING_UNIT_CHAR_LIMIT = 12
-    EVENT_PER_DAY_LIMIT = 111
-
-    users_recurrence_id_monthyears_map: {int: {int: {int: bool}}} # user id, recurrence id, int which represents month number from jan 1, 1970
-
-    class RecurrenceType(Enum):
-        EventOnly = 1
-        TodoOnly = 2
-        Both = 3
-
-    # connect to sql database
-    try:
-        google_db_connection = mysql.connector.connect(
-            host='34.31.57.31',
-            database='database1',
-            user='root',
-            password='supersecretdatabase$$keepout',
-            autocommit=True
-        )
-        connection = google_db_connection
-        cursor = connection.cursor(dictionary=True)
-        if connection.is_connected():
-            print('Connected to calendars database')
-    except Error as e:
-        print(f'Error connecting to MySQL database: {e}')
-
-    @staticmethod
-    @router.post("/api/calendar/items")
-    def add_calendar_item(user_id: int, api_key: str, item_type: str, event: CalendarEvent):
-        if not UserEndpoints.authenticate(user_id, api_key):
-            raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
-        if item_type == "calendar_event":
-            # event = # parse item to CalendarEvent
-            # get next event_id
-            CalendarItemsEndpoint.get_next_event_id(user_id)
-            # do necessary calculations and insert into events_by_user_event_id
-            key_id = CalendarItemsEndpoint.combine_unsigned_ints_bytes(event.userId, event.eventId)
-            reminders_as_bytes = b''
-            if event.reminder1 is not None:
-                reminders_as_bytes.join(event.reminder1.to_bytes(8, "big", signed=True))
-            if event.reminder2 is not None:
-                reminders_as_bytes.join(event.reminder2.to_bytes(8, "big", signed=True))
-            if event.reminder3 is not None:
-                reminders_as_bytes.join(event.reminder3.to_bytes(8, "big", signed=True))
-
-            CalendarItemsEndpoint.cursor.execute(
-                f"INSERT INTO events_by_user_event_id (key_id, name, description, event_type, start_instant, end_instant, start_day, duration, reminders, linked_goal_id, linked_plan_id, linked_action_id, recurrence_id) "
-                f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);", (
-                key_id, event.name, event.description, event.eventType, event.startInstant, event.endInstant,
-                event.startDay, event.duration, reminders_as_bytes, event.linkedGoalId, event.linkedPlanId,
-                event.linkedActionId, event.recurrenceId))
-
-            # insert into events_by_user_day
-            # TODO: make user to add event to other days if it spans multiple days
-            event.startDay = CalendarItemsEndpoint.get_day_of_instant(event.startInstant)
-            key_id = CalendarItemsEndpoint.combine_unsigned_ints_bytes(event.userId, int(event.startDay))
-            CalendarItemsEndpoint.cursor.execute(f"SELECT * FROM events_by_user_day WHERE key_id = %s;", (key_id,))
-            row = CalendarItemsEndpoint.cursor.fetchone()
-            event_id_bytes = event.eventId.to_bytes(4, "big", signed=False)
-            if row is None:
-                CalendarItemsEndpoint.cursor.execute(
-                    f"INSERT INTO events_by_user_day (key_id, event_ids) VALUES (%s, %s);", (key_id, event_id_bytes))
-            else:
-                # throw event_id at the end of the event_ids attribute
-                event_ids = row["event_ids"].join(event_id_bytes)
-                CalendarItemsEndpoint.cursor.execute(f"UPDATE events_by_user_day SET event_ids = %s WHERE key_id = %s;",
-                                                     (event_ids, key_id))
-            return {"message": "event successfully added", "event_id": event.eventId}, 200
-
-        elif item_type == "todo":
-            todo_dict = json.loads(item)
-            todo = ToDo(todo_dict)
-            # insert into todo_by_user_todo_id
-            if todo.userId != user_id:
-                raise HTTPException(status_code=401, detail="user not authorized to access this element")
-            todo_id = CalendarItemsEndpoint.get_next_todo_id(user_id)
-            key_id = CalendarItemsEndpoint.combine_unsigned_ints_bytes(user_id, todo_id)
-            columns = "key_id, name, end_instant, start_day, recurrence_id, goal_id, plan_id, action_id"
-            CalendarItemsEndpoint.cursor.execute("INSERT INTO todos_by_user_todo_id (%s) values (%s, %s, %s, %s, %s, %s, %s, %s)", (columns,
-                key_id, todo.name, todo.endInstant, todo.startDay, todo.recurrenceId, todo.goalId, todo.planId, todo.actionId))
-
-            # insert into todo_by_user_day
-            days = []
-            CalendarItemsEndpoint
 
 
-    @staticmethod
-    @router.put("/api/calendar/events/{event_id}")
-    def update_calendar_event(user_id: int, api_key: str, event_id: int, event: CalendarEvent):
-        if not UserEndpoints.authenticate(user_id, api_key):
-            raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
-        if event_id != event.eventId:
-            raise HTTPException(detail="event_id provided in parameter does not match event_id of the object provided", status_code=400)
-        if event.userId != user_id:
-            raise HTTPException(detail="user is not authorized to access this resource!", status_code=401)
 
-        key_id = CalendarItemsEndpoint.combine_unsigned_ints_bytes(user_id, event.eventId)
-        event.startDay = CalendarItemsEndpoint.get_day_of_instant(event.startInstant)
-        event.endDay = CalendarItemsEndpoint.get_day_of_instant(event.endInstant)
-
-
-        CalendarItemsEndpoint.cursor.execute("SELECT * FROM events_by_user_event_id WHERE key_id = %s", key_id)
-        res = CalendarItemsEndpoint.cursor.fetchone()
-        # figure out what events_by_user_day entries we need to update!
-        old_event_days = []
-        start_datetime = datetime.fromtimestamp(res["start_day"])
-        while True:
-            old_event_days.append(start_datetime)
-            if start_datetime.timestamp() >= res["end_day"]:
-                break
-            start_datetime + datetime.timedelta(days=1)
-
-        new_event_days = []
-        start_datetime = datetime.fromtimestamp(event.startDay)
-        while True:
-            new_event_days.append(start_datetime)
-            if start_datetime.timestamp() >= event.endDay:
-                break
-            start_datetime + datetime.timedelta(days=1)
-
-        days_to_remove = []
-        days_to_add = []
-        for day in old_event_days:
-            if new_event_days.__contains__(day):
-                new_event_days.remove(day)
-            else:
-                days_to_remove.append(day)
-
-        days_to_add = new_event_days
-
-        # add event_id to days
-        for day in days_to_add:
-            key_id = CalendarItemsEndpoint.combine_unsigned_ints_bytes(user_id, day.timestamp().__int__())
-            CalendarItemsEndpoint.cursor.execute("SELECT * FROM events_by_user_day WHERE key_id = %s", key_id)
-            res = CalendarItemsEndpoint.cursor.fetchone()
-            #new_bytes = BytesHelper.add_unsigned_int_to_bytes(res["event_ids"], event_id)
-            #CalendarItemsEndpoint.cursor.execute("ALTER events_by_user_day SET event_ids = %s WHERE key_id = %s",
-             #                                     (new_bytes, key_id))
-        # remove event_id from days
-        for day in days_to_remove:
-            key_id = CalendarItemsEndpoint.combine_unsigned_ints_bytes(user_id, day.timestamp().__int__())
-            CalendarItemsEndpoint.cursor.execute("SELECT * FROM events_by_user_day WHERE key_id = %s", key_id)
-            res = CalendarItemsEndpoint.cursor.fetchone()
-            #new_bytes = BytesHelper.remove_unsigned_int_from_bytes(res["event_ids"], event_id)
-            #CalendarItemsEndpoint.cursor.execute("ALTER events_by_user_day SET event_ids = %s WHERE key_id = %s",
-            #                                      (new_bytes, key_id))
-
-        key_id = CalendarItemsEndpoint.combine_unsigned_ints_bytes(user_id, event.eventId)
-        CalendarItemsEndpoint.cursor.execute("ALTER events_by_user_event_id SET name = %s, description = %s, event_type = %s, start_instant = %s, start_day = %s, end_instant = %s, end_day = %s, duration = %s WHERE key_id = %s",
-                                              (event.name, event.description, event.eventType, event.startInstant, event.startDay, event.endInstant, event.endDay, event.duration, key_id))
-
-        # yuhhhhhh
-        return 200
 
     @staticmethod
     @router.get("/api/calendar/events")
-    def get_calendar_events(user_id: int, api_key: str, start_day: int, end_day: int):
-        if not UserEndpoints.authenticate(user_id, api_key):
-            raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
-
-        # check recurrence events first
-        # get months to check
-        monthyears_to_generate = []
-        curr_datetime = datetime.fromtimestamp(start_day)
-        prev_datetime = datetime.fromtimestamp(0)
-        while curr_datetime.timestamp() <= end_day:
-            if prev_datetime == datetime.fromtimestamp(0) or prev_datetime.month != curr_datetime.month:
-                # add month to months
-                monthyears_to_generate.append(CalendarItemsEndpoint.get_monthyear_of_day(int(curr_datetime.timestamp())))
-            prev_datetime = curr_datetime
-            curr_datetime += datetime.timedelta(weeks=4)
-
-        for monthyear in monthyears_to_generate:
-            CalendarItemsEndpoint.generate_recurrence_events_for_user(user_id, monthyear)
-
-        CalendarItemsEndpoint.cursor.execute(f"SELECT * FROM events_by_user_day WHERE key_id BETWEEN %s AND %s;", (CalendarItemsEndpoint.combine_unsigned_ints_bytes(user_id, start_day), CalendarItemsEndpoint.combine_unsigned_ints_bytes(user_id, end_day)))
-        res_list = CalendarItemsEndpoint.cursor.fetchall()
-        events_list = []
-        for row in res_list:
-            event_ids_bytes = row["event_ids"]
-            event_ids = [] # WAS BytesHelper.split_bytes_into_list(event_ids_bytes, 4)
-            for event_id in event_ids:
-                CalendarItemsEndpoint.cursor.execute(
-                    f"SELECT * FROM events_by_user_event_id WHERE user_event_id = %s;", (event_id))
-                events_list.append(CalendarItemsEndpoint.cursor.fetchone()) # TODO: CHECK IF THIS ACTUALLY WORKS
-
-        print("retrieved calendar events: " + events_list.__str__())
-        return {"events": json.dumps(events_list)}, 200
-
-    @staticmethod
-    @router.get("/api/calendar/events")
-    def get_calendar_events_and_todos(user_id: int, api_key: str, day: int):
-        if not UserEndpoints.authenticate(user_id, api_key):
+    def get_calendar_events_and_todos(authentication: Authentication, day: int):
+        if not UserEndpoints.authenticate(authentication):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         # generate repeating events for given day
         # TODO make this a lot faster so we don't need to call it every time we get events for a given day
@@ -236,30 +48,6 @@ class CalendarItemsEndpoint:
         print("retrieved calendar events: " + events_list.__str__())
         return json.dumps(events_list), 200
 
-    @staticmethod
-    @router.delete("/api/calendar/events/{event_id}")
-    def delete_event(user_id: int, api_key: str, event_id: int):
-        if not UserEndpoints.authenticate(user_id, api_key):
-            raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
-        CalendarItemsEndpoint.cursor.execute(f"SELECT * FROM events_by_user_event_id WHERE user_event_id = %s;", user_id.__str__() + event_id.__str__())
-        res = CalendarItemsEndpoint.cursor.fetchone()
-        if res is None:
-            raise HTTPException(detail=f"event of id: {event_id} could not be found", status_code=404)
-        day = res["start_day"]
-        CalendarItemsEndpoint.cursor.execute(f"DELETE FROM events_by_user_event_id WHERE user_event_id = %s;", (user_id.__str__() + event_id.__str__()),)
-        CalendarItemsEndpoint.cursor.execute(f"DELETE FROM events_by_user_day WHERE key_id = %s;", (user_id.__str__() + day.__str__),)
-        return f"successfully deleted event with id: '{event_id}'", 200
-
-    @staticmethod
-    @router.delete("/api/calendar/events")
-    def delete_events_of_user(user_id: int, api_key: str):
-        if not UserEndpoints.authenticate(user_id, api_key):
-            raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
-        CalendarItemsEndpoint.cursor.execute(
-            f"DELETE FROM events_by_user_event_id WHERE user_event_id BETWEEN %s AND %s;", (user_id.__str__() + "000000000", (user_id+1).__str__() + "000000000"))
-        CalendarItemsEndpoint.cursor.execute(
-            f"DELETE FROM events_by_user_day WHERE key_id BETWEEN %s AND %s;", (user_id.__str__() + "000000000", (user_id+1).__str__() + "000000000"))
-        return "successfully deleted user_id + " + user_id.__str__() + "!!", 200
 
 
 
@@ -335,7 +123,7 @@ class CalendarItemsEndpoint:
 
     # recurrences stuff
     @staticmethod
-    def add_recurrence(user_id: int, api_key: str, recurrence: Recurrence):
+    def add_recurrence(authentication: Authentication, recurrence: Recurrence):
         # new recurrence sequence
         CalendarItemsEndpoint.cursor.execute("SELECT * FROM recurrence_ids_by_user WHERE user_id = %s;",
                                               (user_id,))

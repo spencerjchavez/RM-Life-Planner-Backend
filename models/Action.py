@@ -11,3 +11,15 @@ class Action(BaseModel):
     successful: Optional[int]
     howMuchAccomplished: Optional[int]
     notes: Optional[str]
+
+    def get_sql_insert_query(self):
+        return "INSERT INTO actions (%s, %s, %s, %s, %s, %s, %s);"
+
+    def get_sql_insert_params(self):
+        return (self.planId,
+                self.eventId,
+                self.goalId,
+                self.userId,
+                self.successful,
+                self.howMuchAccomplished,
+                self.notes)

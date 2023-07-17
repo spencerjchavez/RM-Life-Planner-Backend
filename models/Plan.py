@@ -9,3 +9,12 @@ class Plan(BaseModel):
     goalId: Optional[int]
     eventId: Optional[int]
     howMuch: Optional[int]
+
+    def get_sql_insert_query(self):
+        return "INSERT INTO plans (%s, %s, %s, %s);"
+
+    def get_sql_insert_params(self):
+        return (self.userId,
+             self.goalId,
+             self.eventId,
+             self.howMuch)

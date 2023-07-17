@@ -4,12 +4,12 @@ drop table actions;
 drop table plans;
 drop table todos_in_day;
 drop table todos;
-drop table alerts;
 drop table events_in_day;
 drop table events;
+drop table alerts;
 drop table goals;
-drop table desires;
 drop table recurrences;
+drop table desires;
 drop table months_accessed_by_user;
 drop table users;
 
@@ -18,17 +18,17 @@ create table users (
 user_id int unsigned not null primary key auto_increment,
 username varchar(24) not null,
 hashed_password tinyblob not null,
-date_joined bigint not null,
 salt tinyblob not null,
+date_joined bigint not null,
 email varchar(32),
 google_calendar_id varchar(84));
 
 CREATE UNIQUE INDEX username_index ON users(username);
 
 create table months_accessed_by_user(
-month int not null,
-year int not null,
 user_id int unsigned not null,
+year int not null,
+month int not null,
 
 FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
 PRIMARY KEY (month, year, user_id)
@@ -36,35 +36,13 @@ PRIMARY KEY (month, year, user_id)
 
 CREATE INDEX user_id_index ON months_accessed_by_user(user_id);
 
-create table recurrences (
-recurrence_id bigint unsigned not null primary key auto_increment,
-user_id int unsigned not null,
-rrule_string varchar(64) not null,
-start_instant bigint not null,
-
--- recurrent event stuff
-event_name varchar(64),
-event_type int not null,
-event_description varchar(500),
-event_duration int not null,
-
--- recurrent todo stuff
-todo_name varchar(32),
-todo_timeframe int, -- can be a day, a week, or a month in length, depending on rrule
-
--- recurrent goal stuff
-goal_name varchar(42) not null,
-goal_how_much int,
-goal_measuring_units varchar(12),
-goal_timeframe int not null, -- can be a day, a week, or a month in length, depending on rrule
-FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE);
-CREATE INDEX user_id_index ON recurrences(user_id);
-
 create table desires(
-desire_id int unsigned not null primary key auto_increment,
+desire_id bigint unsigned not null primary key auto_increment,
 name varchar(42) not null,
 user_id int unsigned not null,
+date_created bigint not null,
 deadline bigint,
+date_retired bigint,
 priority_level int,
 color_r tinyint unsigned not null,
 color_g tinyint unsigned not null,
@@ -73,9 +51,39 @@ FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE);
 
 CREATE INDEX user_id_index ON desires(user_id);
 
+CREATE TABLE series(
+series_id bigint unsigned primary key not null auto_increment);
+
+create table recurrences (
+recurrence_id bigint unsigned not null primary key auto_increment,
+series_id bigint unsigned not null,
+user_id int unsigned not null,
+rrule_string varchar(64) not null,
+start_instant bigint not null,
+
+-- recurrent event stuff
+event_name varchar(64),
+event_description varchar(500),
+event_duration int not null,
+
+-- recurrent todo stuff
+todo_name varchar(32),
+todo_timeframe int, -- can be a day, a week, or a month in length, depending on rrule
+
+-- recurrent goal stuff
+goal_name varchar(42),
+goal_desire_id bigint unsigned,
+goal_how_much int,
+goal_measuring_units varchar(12),
+goal_timeframe int, -- can be a day, a week, or a month in length, depending on rrule
+FOREIGN KEY (series_id) REFERENCES series(series_id) ON DELETE CASCADE,
+FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+FOREIGN KEY (goal_desire_id) REFERENCES desires(desire_id));
+CREATE INDEX user_id_index ON recurrences(user_id);
+
 create table goals(
 goal_id bigint unsigned primary key not null auto_increment,
-desire_id int unsigned not null,
+desire_id bigint unsigned not null,
 user_id int unsigned not null,
 name varchar(42) not null,
 how_much int,
@@ -98,20 +106,22 @@ event_id bigint unsigned primary key auto_increment not null,
 user_id int unsigned not null,
 name varchar(64),
 description varchar(500),
-event_type int not null,
+is_hidden bool not null,
 start_instant bigint not null,
 end_instant bigint not null,
 duration int not null,
--- start_day int unsigned not null,
--- end_day int unsigned not null,
 
 linked_goal_id bigint unsigned,
+linked_todo_id bigint unsigned,
 recurrence_id bigint unsigned,
 
 FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
 FOREIGN KEY (linked_goal_id) REFERENCES goals(goal_id),
+FOREIGN KEY (linked_todo_id) REFERENCES todos(todo_id)
 FOREIGN KEY (recurrence_id) REFERENCES recurrences(recurrence_id),
 FOREIGN KEY (alert_id) REFERENCES alerts(alert_id));
+
+CREATE INDEX todo_id_index ON events (linked_todo_id);
 
 create table events_in_day(
 day bigint not null,
@@ -126,7 +136,8 @@ CREATE INDEX day_user_index ON events_in_day (day, user_id);
 
 create table alerts(
 event_id bigint unsigned not null,
-when int unsigned not null, -- when the alert should sound
+user_id bigint unsigned not null,
+when bigint not null, -- when the alert should sound
 
 FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE,
 PRIMARY KEY (event_id, when));
@@ -136,7 +147,7 @@ todo_id bigint unsigned primary key not null auto_increment,
 user_id int unsigned not null,
 
 name varchar(32),
-timeframe int not null, -- todos can either span a day, week, or month. timeframe specifies this
+timeframe int not null, -- todos can either span indefinitely, for a day, week, or month. timeframe specifies this
 start_instant bigint not null,
 
 recurrence_id bigint unsigned,
@@ -160,7 +171,7 @@ CREATE INDEX day_user_index ON todos_in_day (day, user_id);
 create table plans(
 plan_id bigint unsigned primary key not null auto_increment,
 user_id int unsigned not null,
-goal_id bigint unsigned not null,
+goal_id bigint unsigned,
 event_id bigint unsigned not null,
 how_much int,
 -- plan_description varchar(500), # same as the event description
@@ -175,7 +186,7 @@ CREATE INDEX event_id_index ON plans(event_id);
 create table actions(
 plan_id bigint unsigned primary key not null,
 event_id bigint unsigned not null,
-goal_id bigint unsigned not null,
+goal_id bigint unsigned,
 user_id int unsigned not null,
 successful int,
 how_much_accomplished int,

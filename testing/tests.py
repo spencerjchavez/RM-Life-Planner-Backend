@@ -34,18 +34,14 @@ if __name__ == '__main__':
         ulist = json.load(file)
         sample_users = ulist
 
-   # recurrence = Recurrence(userId=1)
-    #id = RecurrenceEndpoints.create_recurrence(recurrence)
-   # print(RecurrenceEndpoints.get_recurrence(id))
-
 
     # test register endpoint
     res = requests.post(register_url, data=json.dumps(sample_users["user1"]))
     compare_responses(res, 200)
-    sample_users["user1"]["authentication"] = res.json()[0]
+    sample_users["user1"]["authentication"] = res.json()
     res = requests.post(register_url, data=json.dumps(sample_users["user2"]))
     compare_responses(res, 200)
-    sample_users["user2"]["authentication"] = res.json()[0]
+    sample_users["user2"]["authentication"] = res.json()
 
     res = requests.post(register_url, data=json.dumps(sample_users["user2repeat"]))
     compare_responses(res, 400)
@@ -74,6 +70,12 @@ if __name__ == '__main__':
     compare_responses(res, 400)
     res = requests.post(register_url, data=json.dumps(sample_users["invalid10"]))
     compare_responses(res, 400)
+
+    # delete when done
+    recurrence = Recurrence(userId=sample_users["user1"]["authentication"]["user_id"])
+    id = RecurrenceEndpoints.create_recurrence(sample_users["user1"]["authentication"], recurrence)
+    print(RecurrenceEndpoints.get_recurrence(id))
+
 
     # test logout
     res = requests.post(logout_url, params=sample_users["user1"]["authentication"])
