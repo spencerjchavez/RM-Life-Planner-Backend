@@ -7,11 +7,6 @@
     "duration": 0,
     "endInstant": 0,
     "rruleString": "",
-    isInPast: False,
-    happened: bool
-    report: str
-    eventType: int
-  },
   "user1event2": {
 
   },

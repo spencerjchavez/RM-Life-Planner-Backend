@@ -30,7 +30,7 @@ if __name__ == '__main__':
     login_url = users_url + "/login"
     logout_url = users_url + "/logout"
     calendar_events_url = "/calendars/events"
-    with open('users.json', 'r') as file:
+    with open('sample_objects/users.json', 'r') as file:
         ulist = json.load(file)
         sample_users = ulist
 
