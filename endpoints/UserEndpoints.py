@@ -61,15 +61,20 @@ def register_user(user: User):
         if re.match(email_pattern, user.email) is None:
             raise HTTPException(detail="Must enter a valid email address!", status_code=400)
 
-    if is_username_in_use(user.username)["is_in_use"] ==\
+    if is_username_in_use(user.username)[1]["is_in_use"] ==\
             "True":
         print(f"username {user.username} already exists")
         raise HTTPException(detail="Username already in use", status_code=400)
-    date_joined = int(time.time())
+    date_joined = time.time()
     # hash password
     password = user.password
     salt = bcrypt.gensalt()
     hashed_password = bcrypt.hashpw(password.encode("utf-8"), salt)
+
+    user.dateJoined = date_joined
+    user.salt = salt
+    user.password = hashed_password
+
     # insert user into database
     stmt = user.get_sql_insert_query()
     params = user.get_sql_insert_params()
@@ -155,11 +160,13 @@ def delete_user(authentication: Authentication, user_id: int):
     print("deleted user of id: " + user_id.__str__())
     return 200, "successfully deleted!"
 
+
 def gen_api_key(user_id: int):
     letters = string.ascii_letters
     api_key = ''.join(random.choice(letters) for _ in range(50))
     api_keys_by_userId[user_id] = {"api_key": api_key, "time_created": time.time()}
     return Authentication(user_id=user_id, api_key=api_key)
+
 
 def authenticate(authentication: Authentication):
     user_id = authentication.user_id

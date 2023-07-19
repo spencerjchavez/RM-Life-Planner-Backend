@@ -6,7 +6,7 @@ class User(BaseModel):
     username: Optional[str]
     password: Optional[str]
     salt: Optional[str]
-    userId: Optional[str]
+    userId: Optional[int]
     email: Optional[str]
     googleCalendarId: Optional[str]
     dateJoined: Optional[int]
@@ -15,10 +15,10 @@ class User(BaseModel):
         return "INSERT INTO users (%s, %s, %s, %s, %s, %s);"
 
     def get_sql_insert_params(self):
-            return (self.username,
-             self.password,
-             self.salt,
-             self.dateJoined,
-             self.email,
-             self.googleCalendarId
-             )
+        return (self.username,
+                self.password,
+                self.salt,
+                self.dateJoined,
+                self.email,
+                self.googleCalendarId
+                )
