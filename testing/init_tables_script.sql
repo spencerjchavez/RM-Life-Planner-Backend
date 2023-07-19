@@ -11,6 +11,7 @@ drop table goals;
 drop table recurrences;
 drop table desires;
 drop table months_accessed_by_user;
+drop table series;
 drop table users;
 
 
@@ -101,47 +102,6 @@ FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE);
 
 CREATE INDEX desire_id_index ON goals(desire_id);
 
-create table events(
-event_id bigint unsigned primary key auto_increment not null,
-user_id int unsigned not null,
-name varchar(64),
-description varchar(500),
-is_hidden bool not null,
-start_instant bigint not null,
-end_instant bigint not null,
-duration int not null,
-
-linked_goal_id bigint unsigned,
-linked_todo_id bigint unsigned,
-recurrence_id bigint unsigned,
-
-FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-FOREIGN KEY (linked_goal_id) REFERENCES goals(goal_id),
-FOREIGN KEY (linked_todo_id) REFERENCES todos(todo_id)
-FOREIGN KEY (recurrence_id) REFERENCES recurrences(recurrence_id),
-FOREIGN KEY (alert_id) REFERENCES alerts(alert_id));
-
-CREATE INDEX todo_id_index ON events (linked_todo_id);
-
-create table events_in_day(
-day bigint not null,
-event_id bigint unsigned not null,
-user_id int unsigned not null,
-
-FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-FOREIGN KEY (event_id) REFERENCES events(event_id),
-PRIMARY KEY (day, event_id));
-
-CREATE INDEX day_user_index ON events_in_day (day, user_id);
-
-create table alerts(
-event_id bigint unsigned not null,
-user_id bigint unsigned not null,
-when bigint not null, -- when the alert should sound
-
-FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE,
-PRIMARY KEY (event_id, when));
-
 create table todos(
 todo_id bigint unsigned primary key not null auto_increment,
 user_id int unsigned not null,
@@ -167,6 +127,46 @@ FOREIGN KEY (todo_id) REFERENCES todos(todo_id),
 PRIMARY KEY (day, todo_id));
 
 CREATE INDEX day_user_index ON todos_in_day (day, user_id);
+
+create table events(
+event_id bigint unsigned primary key auto_increment not null,
+user_id int unsigned not null,
+name varchar(64),
+description varchar(500),
+is_hidden bool not null,
+start_instant bigint not null,
+end_instant bigint not null,
+duration int not null,
+
+linked_goal_id bigint unsigned,
+linked_todo_id bigint unsigned,
+recurrence_id bigint unsigned,
+
+FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+FOREIGN KEY (linked_goal_id) REFERENCES goals(goal_id),
+FOREIGN KEY (linked_todo_id) REFERENCES todos(todo_id),
+FOREIGN KEY (recurrence_id) REFERENCES recurrences(recurrence_id));
+
+CREATE INDEX todo_id_index ON events (linked_todo_id);
+
+create table events_in_day(
+day bigint not null,
+event_id bigint unsigned not null,
+user_id int unsigned not null,
+
+FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+FOREIGN KEY (event_id) REFERENCES events(event_id),
+PRIMARY KEY (day, event_id));
+
+CREATE INDEX day_user_index ON events_in_day (day, user_id);
+
+create table alerts(
+event_id bigint unsigned not null,
+user_id bigint unsigned not null,
+time bigint not null, -- when the alert should sound
+
+FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE,
+PRIMARY KEY (event_id, time));
 
 create table plans(
 plan_id bigint unsigned primary key not null auto_increment,
