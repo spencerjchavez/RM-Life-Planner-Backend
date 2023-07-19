@@ -3,7 +3,7 @@
     "username": "user1",
     "password": "passwordpassword",
     "email": "email@realemail.com",
-    "google_calendar_id": "google_calendar_id321"
+    "googleCalendarId": "google_calendar_id321"
   },
   "user2": {
     "username": "user2",

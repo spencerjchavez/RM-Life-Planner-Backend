@@ -36,19 +36,17 @@ if __name__ == '__main__':
 
 
     # test register endpoint
-    res = requests.post(register_url, data=json.dumps(sample_users["user1"]))
+    res = requests.post(register_url, json=json.dumps(sample_users["user1"]))
     compare_responses(res, 200)
     sample_users["user1"]["authentication"] = res.json()
     res = requests.post(register_url, data=json.dumps(sample_users["user2"]))
     compare_responses(res, 200)
     sample_users["user2"]["authentication"] = res.json()
-
     res = requests.post(register_url, data=json.dumps(sample_users["user2repeat"]))
     compare_responses(res, 400)
-
     res = requests.post(register_url, data=json.dumps(sample_users["user3"]))
     compare_responses(res, 200)
-    sample_users["user3"]["authentication"] = res.json()[0]
+    sample_users["user3"]["authentication"] = res.json()
 
     res = requests.post(register_url, data=json.dumps(sample_users["invalid1"]))
     compare_responses(res, 400)

@@ -2,47 +2,31 @@
 
 import uvicorn
 from fastapi import FastAPI
-from endpoints.UserEndpoints import UserEndpoints
-from endpoints.GoalAchievingEndpoints import GoalAchievingEndpoint
+from endpoints.GoalAchievingEndpoints import GoalAchievingEndpoints
 from endpoints.RecurrenceEndpoints import RecurrenceEndpoints
 from endpoints.AlertEndpoints import AlertEndpoints
 from endpoints.CalendarToDoEndpoints import CalendarToDoEndpoints
 from endpoints.CalendarEventEndpoints import CalendarEventEndpoints
-from endpoints.MonthsAccessedByUserEndpoints import HelperFunctions
 import mysql.connector
 from mysql.connector import Error
 
+
 class Routes:
     def __init__(self):
-        try:
-            db_connection = mysql.connector.connect(
-                host='34.31.57.31',
-                database='database1',
-                user='root',
-                password='supersecretdatabase$$keepout',
-                autocommit=True
-            )
-            cursor = db_connection.cursor(dictionary=True)
-            if db_connection.is_connected():
-                print('Connected to database')
 
-                UserEndpoints.cursor = cursor
-                AlertEndpoints.cursor = cursor
-                CalendarToDoEndpoints.cursor = cursor
-                CalendarEventEndpoints.cursor = cursor
-                RecurrenceEndpoints.cursor = cursor
-                GoalAchievingEndpoint.cursor = cursor
-                HelperFunctions.cursor = cursor
+                alert_endpoints = AlertEndpoints(cursor=cursor)
+                recurrence_endpoints = RecurrenceEndpoints(cursor=cursor, user_endpoints=user_endpoints)
+                calendar_event_endpoints = CalendarEventEndpoints(cursor=cursor, user_endpoints=user_endpoints, recurrence_endpoints=recurrence_endpoints)
+                calendar_todo_endpoints = CalendarToDoEndpoints(cursor=cursor, user_endpoints=user_endpoints, recurrence_endpoints=recurrence_endpoints)
+                goal_achieving_endpoints = GoalAchievingEndpoints(cursor=cursor, user_endpoints=user_endpoints)
 
                 app = FastAPI()
-                app.include_router(UserEndpoints.router)
-                app.include_router(AlertEndpoints.router)
-                app.include_router(CalendarEventEndpoints.router)
-                app.include_router(CalendarToDoEndpoints.router)
-                app.include_router(RecurrenceEndpoints.router)
-                app.include_router(GoalAchievingEndpoint.router)
+                app.include_router(user_endpoints.router)
+                app.include_router(alert_endpoints.router)
+                app.include_router(calendar_event_endpoints.router)
+                app.include_router(calendar_todo_endpoints.router)
+                app.include_router(recurrence_endpoints.router)
+                app.include_router(goal_achieving_endpoints.router)
 
                 uvicorn.run(app, host="localhost", port=8000)
 
-        except Error as e:
-            print(f'Error connecting to MySQL database: {e}')

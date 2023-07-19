@@ -1,0 +1,18 @@
+{
+  "unreported_action": {
+    "successful": 0
+  },
+  "partial_action": {
+    "successful": 3,
+    "howMuchAccomplished": 1,
+    "notes": "did not finish, but completed 1"
+  },
+  "unsuccessful_action": {
+      "successful": 2
+  },
+  "successful_action": {
+    "successful": 1,
+    "howMuchAccomplished": 10,
+    "notes": "So good"
+  }
+}

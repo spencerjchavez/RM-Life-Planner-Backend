@@ -1,0 +1,111 @@
+{
+  "recurrence_event_1": {
+    "rruleString" : "",
+    "startInstant": ,
+
+    "eventName": "",
+    "eventDescription": "",
+    "eventDuration": 1
+  },
+  "recurrence_event_2": {
+    "rruleString" : "",
+    "startInstant": ,
+
+    "eventName": "",
+    "eventDescription": "",
+    "eventDuration": 1
+  },
+  "recurrence_event_3": {
+    "rruleString" : "",
+    "startInstant": ,
+
+    "eventName": "",
+    "eventDescription": "",
+    "eventDuration": 1
+  },
+  "recurrence_todo_1": {
+    "rruleString" : "",
+    "startInstant": ,
+
+    "todoName": ,
+    "todoTimeframe":
+  },
+  "recurrence_todo_2": {
+    "rruleString" : "",
+    "startInstant": ,
+
+    "todoName": ,
+    "todoTimeframe":
+  },
+  "recurrence_todo_3": {
+    "rruleString" : "",
+    "startInstant": ,
+
+    "todoName": ,
+    "todoTimeframe":
+  },
+  "recurrence_goal_1": {
+    "rruleString" : "",
+    "startInstant": ,
+
+    "goalName": ,
+    "goalDesireId": ,
+    "goalHowMuch": ,
+    "goalMeasuringUnits": ,
+    "goalTimeframe":
+  },
+  "recurrence_goal_2": {
+    "rruleString" : "",
+    "startInstant": ,
+
+    "goalName": ,
+    "goalDesireId": ,
+    "goalHowMuch": ,
+    "goalMeasuringUnits": ,
+    "goalTimeframe":
+  },
+  "recurrence_goal_3": {
+    "rruleString" : "",
+    "startInstant": ,
+
+    "goalName": ,
+    "goalDesireId": ,
+    "goalHowMuch": ,
+    "goalMeasuringUnits": ,
+    "goalTimeframe":
+  },
+  "recurrence_event_todo_goal_1": {
+    "rruleString" : "",
+    "startInstant": ,
+
+    "eventName": "",
+    "eventDescription": "",
+    "eventDuration": O,
+
+    "todoName": ,
+    "todoTimeframe": ,
+
+    "goalName": ,
+    "goalDesireId": ,
+    "goalHowMuch": ,
+    "goalMeasuringUnits": ,
+    "goalTimeframe":
+  },
+  "recurrence_event_todo_goal_2": {
+    "rruleString" : "",
+    "startInstant": ,
+
+    "eventName": "",
+    "eventDescription": "",
+    "eventDuration": O,
+
+    "todoName": ,
+    "todoTimeframe": ,
+
+    "goalName": ,
+    "goalDesireId": ,
+    "goalHowMuch": ,
+    "goalMeasuringUnits": ,
+    "goalTimeframe":
+  }
+}
