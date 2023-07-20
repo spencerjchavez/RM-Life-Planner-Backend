@@ -2,11 +2,11 @@ use database1;
 
 drop table actions;
 drop table plans;
-drop table todos_in_day;
-drop table todos;
+drop table alerts;
 drop table events_in_day;
 drop table events;
-drop table alerts;
+drop table todos_in_day;
+drop table todos;
 drop table goals;
 drop table recurrences;
 drop table desires;
@@ -16,7 +16,7 @@ drop table users;
 
 
 create table users (
-user_id int unsigned not null primary key auto_increment,
+user_id int unsigned primary key auto_increment,
 username varchar(24) not null,
 hashed_password tinyblob not null,
 salt tinyblob not null,

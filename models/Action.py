@@ -21,7 +21,7 @@ class Action(BaseModel):
     notes: Optional[str]
 
     def get_sql_insert_query(self):
-        return "INSERT INTO actions (%s, %s, %s, %s, %s, %s, %s);"
+        return "INSERT INTO actions VALUES (%s, %s, %s, %s, %s, %s, %s);"
 
     def get_sql_insert_params(self):
         return (self.planId,

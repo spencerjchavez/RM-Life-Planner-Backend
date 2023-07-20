@@ -23,21 +23,9 @@ desire_categories_per_user_limit = 10
 goals_per_desire_limit = 20
 
 router = APIRouter()
-try:
-    db_connection = mysql.connector.connect(
-        host='34.31.57.31',
-        database='database1',
-        user='root',
-        password='supersecretdatabase$$keepout',
-        autocommit=True
-    )
-    cursor = db_connection.cursor(dictionary=True)
-    if db_connection.is_connected():
-        print('Connected to database')
-except Error as e:
-    print(f'Error connecting to MySQL database: {e}')
-    
-    
+cursor: MySQLCursor
+
+
 # DESIRE ENDPOINTS
 @router.post("/api/desires")
 def create_desire(authentication: Authentication, desire: Desire):
@@ -50,7 +38,7 @@ def create_desire(authentication: Authentication, desire: Desire):
     query = desire.get_sql_insert_query()
     params = desire.get_sql_insert_params()
     cursor.execute(query, params)
-    return {"message": "Desire created successfully", "desire_id": cursor.lastrowid}, 200
+    return {"message": "Desire created successfully", "desire_id": cursor.lastrowid}
 
 
 @router.get("/api/desires/{desire_id}")
@@ -64,7 +52,7 @@ def get_desire(authentication: Authentication, desire_id: int):
         return "no such desire_id found!", 404
     if res["user_id"] != user_id:
         raise HTTPException(detail="User is not authenticated to access this resource", status_code=401)
-    return {"message": "successfully got desire", "desire": res.__dict__}, 200
+    return {"message": "successfully got desire", "desire": res.__dict__}
 
 
 @router.put("/api/desires/{desire_id}")
@@ -73,7 +61,7 @@ def update_desire(authentication: Authentication, desire_id: int, updated_desire
     query = f"UPDATE desires SET {_.NAME} = %s, {_.DEADLINE} = %s, {_.DATE_RETIRED} = %s, {_.PRIORITY_LEVEL} = %s,  {_.COLOR_R} = %s, {_.COLOR_G} = %s, {_.COLOR_B} = %s WHERE desire_id = %s"
     params = (updated_desire.name, updated_desire.deadline, updated_desire.dateRetired, updated_desire.priorityLevel, updated_desire.colorR, updated_desire.colorG, updated_desire.colorB, desire_id)
     cursor.execute(query, params)
-    return f"Desire with ID {desire_id} updated successfully", 200
+    return f"Desire with ID {desire_id} updated successfully"
 
 
 @router.delete("/api/desires/{desire_id}")
@@ -89,7 +77,7 @@ def delete_desire(authentication: Authentication, desire_id: int):
         raise HTTPException(detail="User is not authorized to access this resource", status_code=401)
 
     cursor.execute("DELETE FROM desires WHERE desire_id = %s", (desire_id,))
-    return f"Desire with ID {desire_id} deleted successfully", 200
+    return f"Desire with ID {desire_id} deleted successfully"
 
 
 #
@@ -110,7 +98,7 @@ def create_goal(authentication: Authentication, goal: Goal):
     params = goal.get_sql_insert_params()
     cursor.execute(stmt, params)
     goal_id = cursor.lastrowid
-    return {"message": "Goal created successfully", "goal_id": goal_id}, 200
+    return {"message": "Goal created successfully", "goal_id": goal_id}
 
 
 @router.get("/api/goals/{goal_id}")
@@ -124,15 +112,15 @@ def get_goal(authentication: Authentication, goal_id: int):
         raise HTTPException(detail="No goal of specified id found", status_code=404)
     if res["user_id"] != user_id:
         raise HTTPException(detail="User is not authorized to access this resource", status_code=401)
-    return {"goal: ": res}, 200
+    return {"goal: ": res}
 
 
 @router.put("/api/goals/{goal_id}")
 def update_goal(authentication: Authentication, goal_id: int, updated_goal: Goal):
-    goal_dict = get_goal(authentication, goal_id)[0]
+    goal_dict = get_goal(authentication, goal_id)
     cursor.execute("UPDATE goals SET desire_id = %s, name = %s, how_much = %s, measuring_units = %s, end_instant = %s WHERE goal_id = %s",
                                          (updated_goal.desireId, updated_goal.name, updated_goal.howMuch, updated_goal.measuringUnits, updated_goal.endInstant, goal_id))
-    return {"message": f"Goal with ID {goal_id} updated successfully"}, 200
+    return {"message": f"Goal with ID {goal_id} updated successfully"}
 
 
 @router.delete("/api/goals/{goal_id}")
@@ -167,7 +155,7 @@ def create_plan(authentication: Authentication, plan: Plan):
     params = plan.get_sql_insert_params()
     cursor.execute(stmt, params)
     plan_id = cursor.lastrowid
-    return {"message": "Plan created successfully", "plan_id": plan_id}, 200
+    return {"message": "Plan created successfully", "plan_id": plan_id}
 
 
 @router.get("/api/plans/{plan_id}")
@@ -181,15 +169,15 @@ def get_plan(authentication: Authentication, plan_id: int):
         raise HTTPException(detail="no such plan exists", status_code=404)
     if user_id != res["user_id"]:
         raise HTTPException(detail="User is not authorized to access this object", status_code=401)
-    return {"plan": res}, 200
+    return {"plan": res}
 
 
 @router.put("/api/plans/{plan_id}")
 def update_plan(authentication: Authentication, plan_id: int, updated_plan: Plan):
-    old_plan_dict = get_plan(authentication, plan_id)[0]
+    old_plan_dict = get_plan(authentication, plan_id)
     cursor.execute("UPDATE plans SET goal_id = %s, event_id = %s, how_much = %s WHERE plan_id = %s;",
                                          (updated_plan.goalId, updated_plan.eventId, updated_plan.howMuch, plan_id))
-    return {"message": f"Plan with ID {plan_id} updated successfully"}, 200
+    return {"message": f"Plan with ID {plan_id} updated successfully"}
 
 
 @router.delete("/api/plans/{plan_id}")
@@ -214,7 +202,7 @@ def create_action(authentication: Authentication, action: Action):
     params = action.get_sql_insert_params()
     cursor.execute(stmt, params)
     action_id = cursor.lastrowid
-    return {"message": "Action created successfully", "action_id": action_id}, 200
+    return {"message": "Action created successfully", "action_id": action_id}
 
 
 @router.get("/api/actions/{action_id}")
@@ -228,7 +216,7 @@ def get_action(authentication: Authentication, action_id: int):
         raise HTTPException(detail="Specified resource does not exist", status_code=404)
     if user_id != res["user_id"]:
         raise HTTPException(detail="User is not authorized to access this object", status_code=401)
-    return res, 200
+    return res
 
 
 @router.put("/api/actions/{action_id}")
@@ -243,4 +231,4 @@ def update_action(authentication: Authentication, action_id: int, updated_action
 def delete_action(authentication: Authentication, action_id: int):
     get_action(authentication, action_id)  # authenticate
     cursor.execute("DELETE FROM actions WHERE action_id = %s", (action_id,))
-    return "success", 200
+    return "success"

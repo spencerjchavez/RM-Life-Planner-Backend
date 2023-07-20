@@ -5,7 +5,6 @@ from enum import Enum
 
 
 class Goal(BaseModel):
-
     class Timeframe(Enum):
         INDEFINITE = 0
         DAY = 1
@@ -20,21 +19,23 @@ class Goal(BaseModel):
     howMuch: Optional[int]
     measuringUnits: Optional[str]
     startInstant: Optional[float]
-    endInstant: Optional[float] # null == goal is indefinite. This parameter is overridden by timeframe in recurring goals
+    endInstant: Optional[
+        float]  # null == goal is indefinite. This parameter is overridden by timeframe in recurring goals
     # recurring goal stuff
     recurrenceId: Optional[int]
     timeframe: Optional[Timeframe]
 
     def get_sql_insert_query(self):
-        return "INSERT INTO goals (%s, %s, %s, %s, %s, %s, %s, %s, %s);"
+        return "INSERT INTO goals VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
 
     def get_sql_insert_params(self):
-        return (self.desireId,
-             self.userId,
-             self.name,
-             self.howMuch,
-             self.measuringUnits,
-             self.startInstant,
-             self.endInstant,
-             self.recurrenceId,
-             self.timeframe)
+        return (None,
+                self.desireId,
+                self.userId,
+                self.name,
+                self.howMuch,
+                self.measuringUnits,
+                self.startInstant,
+                self.endInstant,
+                self.recurrenceId,
+                self.timeframe)

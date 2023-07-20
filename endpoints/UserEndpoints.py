@@ -12,22 +12,8 @@ from models.User import User
 
 
 router = APIRouter()
-
-try:
-    db_connection = mysql.connector.connect(
-        host='34.31.57.31',
-        database='database1',
-        user='root',
-        password='supersecretdatabase$$keepout',
-        autocommit=True
-    )
-    cursor = db_connection.cursor(dictionary=True)
-    if db_connection.is_connected():
-        print('Connected to database')
-except Error as e:
-    print(f'Error connecting to MySQL database: {e}')
-
 cursor: MySQLCursor
+
 
 api_keys_by_userId = {}
 # assumes days are received in terms of epoch-seconds
@@ -61,7 +47,7 @@ def register_user(user: User):
         if re.match(email_pattern, user.email) is None:
             raise HTTPException(detail="Must enter a valid email address!", status_code=400)
 
-    if is_username_in_use(user.username)[1]["is_in_use"] ==\
+    if is_username_in_use(user.username)["is_in_use"] ==\
             "True":
         print(f"username {user.username} already exists")
         raise HTTPException(detail="Username already in use", status_code=400)
@@ -73,25 +59,20 @@ def register_user(user: User):
 
     user.dateJoined = date_joined
     user.salt = salt
-    user.password = hashed_password
+    user.hashedPassword = hashed_password
 
     # insert user into database
     stmt = user.get_sql_insert_query()
     params = user.get_sql_insert_params()
     cursor.execute(stmt, params)
 
-    login_res = login_user(user.username, password)
-    if login_res[1] != 200:
-        print("somethings wrong: user account created but could not be logged in")
-        raise HTTPException(detail="user account created, but an internal error prevented it from being logged in!",
-                            status_code=500)
-    return login_res
+    return login_user(user.username, password)
 
 
 @router.get("/api/users/register")
 def is_username_in_use(username: str):
     cursor.execute("SELECT * FROM users WHERE username = %s;", (username,))
-    return 200, {"is_in_use": "True" if cursor.fetchone() is not None else "False"}
+    return {"is_in_use": "True" if cursor.fetchone() is not None else "False"}
 
 
 @router.post("/api/users/login")
@@ -103,7 +84,7 @@ def login_user(username: str, password: str):
     hashed_password = bcrypt.hashpw(password, salt)
     if res["hashed_password"] == hashed_password:
         #successfully logged in!
-        return {"authentication": gen_api_key(res["user_id"])}, 200
+        return {"authentication": gen_api_key(res["user_id"])}
     raise HTTPException(status_code=401, detail="username or password is incorrect")
 
 
@@ -128,16 +109,16 @@ def get_user(authentication: Authentication, user_id):
     # Don't return user's salt or hashed_password
     user["salt"] = None
     user["hashed_password"] = None
-    return {"message": "successfully got user", "user": user}, 200
+    return {"message": "successfully got user", "user": user}
 
 
 @router.put("/api/users/{user_id}")
 def update_user(authentication: Authentication, user_id: int, updated_user: User):
     res = get_user(authentication)
-    original_user_dict = res[0]["user"]
+    original_user_dict = res["user"]
     # make sure the user isn't changing any properties they aren't allowed to
     cursor.execute("UPDATE users SET (password = %s, email = %s, google_calendar_id = %s)", (updated_user.password, updated_user.email, updated_user.googleCalendarId))
-    return "successfully updated", 200
+    return "successfully updated"
 
 @router.delete("/api/users/{user_id}")
 def delete_user(authentication: Authentication, user_id: int):
@@ -158,7 +139,7 @@ def delete_user(authentication: Authentication, user_id: int):
     cursor.execute("DELETE FROM users WHERE user_id = %s;", (user_id,))
     del api_keys_by_userId[user_id]
     print("deleted user of id: " + user_id.__str__())
-    return 200, "successfully deleted!"
+    return "successfully deleted!"
 
 
 def gen_api_key(user_id: int):

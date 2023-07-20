@@ -13,20 +13,7 @@ from endpoints import UserEndpoints, RecurrenceEndpoints
 # TODO: make sure IN ALL ENDPOINTS when a user creates a resource the user_id matches
 
 router = APIRouter()
-
-try:
-    db_connection = mysql.connector.connect(
-        host='34.31.57.31',
-        database='database1',
-        user='root',
-        password='supersecretdatabase$$keepout',
-        autocommit=True
-    )
-    cursor = db_connection.cursor(dictionary=True)
-    if db_connection.is_connected():
-        print('Connected to database')
-except Error as e:
-    print(f'Error connecting to MySQL database: {e}')
+cursor: MySQLCursor
 
 
 @router.post("/api/calendar/events")
@@ -39,7 +26,7 @@ def create_calendar_event(authentication: Authentication, event: CalendarEvent):
     # insert into events_by_user_day
     stmt, params = event.get_sql_events_in_day_insert_query_and_params()
     cursor.execute(stmt, params)
-    return {"message": "event successfully added", "event_id": event.eventId}, 200
+    return {"message": "event successfully added", "event_id": event.eventId}
 
 
 @router.get("/api/calendar/events")
@@ -50,7 +37,7 @@ def get_calendar_event(authentication: Authentication, event_id: int):
     res = cursor.fetchone()
     if res["user_id"] != authentication.user_id:
         raise HTTPException(detail="User is not authenticated to access this resource", status_code=401)
-    return res, 200
+    return res
 
 
 @router.get("/api/calendar/events")
@@ -79,7 +66,7 @@ def get_calendar_events(authentication: Authentication, start_day: float, end_da
         stmt += f"SELECT * FROM events WHERE event_id = {event_id};"
     cursor.execute(stmt, multi=True)
     res = cursor.fetchall()
-    return {"events": res}, 200
+    return {"events": res}
 
 
 @router.put("/api/calendar/events/{event_id}")
@@ -104,7 +91,6 @@ def update_calendar_event(authentication: Authentication, event_id: int, event: 
         cursor.execute(query, params)  # add back to events_in_day
 
     # yuhhhhhh
-    return 200
 
 
 @router.delete("/api/calendar/events/{event_id}")
@@ -112,7 +98,7 @@ def delete_event(authentication: Authentication, event_id: int):
     get_calendar_event(authentication, event_id)  # authenticate
     cursor.execute("DELETE FROM events WHERE event_id = %s", (event_id,))
     cursor.execute("DELETE FROM events_in_day WHERE event_id = %s", (event_id,))
-    return f"successfully deleted event with id: '{event_id}'", 200
+    return f"successfully deleted event with id: '{event_id}'"
 
 
 @router.delete("/api/calendar/events")

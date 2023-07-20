@@ -7,9 +7,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 
 
-
 class ToDo(BaseModel):
-
     class Timeframe(Enum):
         INDEFINITE = 0
         DAY = 1
@@ -28,15 +26,16 @@ class ToDo(BaseModel):
     linkedGoalId: Optional[int]
 
     def get_sql_insert_query(self):
-        return "INSERT INTO todos (%s, %s, %s, %s, %s, %s);"
+        return "INSERT INTO todos VALUES (%s, %s, %s, %s, %s, %s, %s);"
 
     def get_sql_insert_params(self):
-        return (self.userId,
-             self.name,
-             self.timeframe,
-             self.startInstant,
-             self.recurrenceId,
-             self.linkedGoalId)
+        return (None,
+                self.userId,
+                self.name,
+                self.timeframe,
+                self.startInstant,
+                self.recurrenceId,
+                self.linkedGoalId)
 
     def get_sql_todos_in_day_insert_query_and_params(self):
         # INDEFINITE timeframe todos do not appear in todos_in_day, as they are not bounded to any timeframe, but will simply disappear when they are completed
@@ -55,4 +54,4 @@ class ToDo(BaseModel):
         values_str = ""
         for day in days:
             values_str += f"({day}, {self.todoId}, {self.userId}) "
-        return "INSERT INTO events_in_day (day, event_id, user_id) VALUES %s, ;", values_str[1:]
+        return "INSERT INTO events_in_day VALUES (day, event_id, user_id) VALUES %s, ;", values_str[1:]

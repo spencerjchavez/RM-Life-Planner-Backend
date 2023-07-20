@@ -14,20 +14,7 @@ from dateutil.rrule import rrulestr
 from endpoints import UserEndpoints
 
 router = APIRouter()
-
-try:
-    db_connection = mysql.connector.connect(
-        host='34.31.57.31',
-        database='database1',
-        user='root',
-        password='supersecretdatabase$$keepout',
-        autocommit=True
-    )
-    cursor = db_connection.cursor(dictionary=True)
-    if db_connection.is_connected():
-        print('Connected to database')
-except Error as e:
-    print(f'Error connecting to MySQL database: {e}')
+cursor: MySQLCursor
 
 months_accessed_cache: {int: {int: {int: bool}}}  # user_id, year, month, if month has been accessed
 
@@ -59,7 +46,7 @@ def get_recurrence(authentication: Authentication, recurrence_id: int):
     res = cursor.fetchone()
     if res["user_id"] != authentication.user_id:
         raise HTTPException(status_code=401, detail="User is not authenticated to access this resource")
-    return res, 200
+    return res
 
 
 @router.put("/api/recurrences/{recurrence_id}")
@@ -67,7 +54,7 @@ def update_recurrence(authentication: Authentication, recurrence_id: int, recurr
                       after: float,
                       inclusive: bool):
     # deletes all future events and regenerates them with the new recurrence rule
-    old_recurrence = get_recurrence(authentication, recurrence_id)[0]  # authentication
+    old_recurrence = get_recurrence(authentication, recurrence_id)  # authentication
     delete_recurrences_after_date(authentication, recurrence_id, after, inclusive)
     # insert new recurrence
     recurrence.startInstant = after
@@ -98,7 +85,7 @@ def set_recurrence_end(authentication: Authentication, recurrence_id: int, end: 
 def delete_recurrence(authentication: Authentication, recurrence_id: int):
     get_recurrence(authentication, recurrence_id)  # authentication
     cursor.execute("DELETE FROM recurrences WHERE recurrence_id = %s", (recurrence_id,))
-    return 200, "recurrence successfully deleted"
+    return "recurrence successfully deleted"
 
 
 @router.delete("/api/recurrences/{recurrence_id}")

@@ -23,23 +23,24 @@ class Recurrence(BaseModel):
     goalTimeframe: Optional[int] = None
 
     def get_sql_insert_query(self):
-        return "INSERT INTO recurrences (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
+        return "INSERT INTO recurrences VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
 
     def get_sql_insert_params(self):
-        return (self.userId,
-             self.seriesId,
-             self.rruleString,
-             self.startInstant,
+        return (None,
+                self.userId,
+                self.seriesId,
+                self.rruleString,
+                self.startInstant,
 
-             self.eventName,
-             self.eventDescription,
-             self.eventDuration,
+                self.eventName,
+                self.eventDescription,
+                self.eventDuration,
 
-             self.todoName,
-             self.todoTimeframe,
+                self.todoName,
+                self.todoTimeframe,
 
-             self.goalName,
-             self.goalDesireId,
-             self.goalHowMuch,
-             self.goalMeasuringUnits,
-             self.todoTimeframe)
+                self.goalName,
+                self.goalDesireId,
+                self.goalHowMuch,
+                self.goalMeasuringUnits,
+                self.todoTimeframe)

@@ -14,20 +14,7 @@ from endpoints import UserEndpoints, RecurrenceEndpoints
 
 MEASURING_UNIT_CHAR_LIMIT = 12
 router = APIRouter()
-
-try:
-    db_connection = mysql.connector.connect(
-        host='34.31.57.31',
-        database='database1',
-        user='root',
-        password='supersecretdatabase$$keepout',
-        autocommit=True
-    )
-    cursor = db_connection.cursor(dictionary=True)
-    if db_connection.is_connected():
-        print('Connected to database')
-except Error as e:
-    print(f'Error connecting to MySQL database: {e}')
+cursor: MySQLCursor
 
 
 @router.post("/api/calendar/todos")
@@ -43,7 +30,7 @@ def create_todo(authentication: Authentication, todo: ToDo):
     # insert into todos_by_user_day
     stmt, params = todo.get_sql_todos_in_day_insert_query_and_params()
     cursor.execute(stmt, params)
-    return {"message": "todo successfully added", "todo_id": todo.todoId}, 200
+    return {"message": "todo successfully added", "todo_id": todo.todoId}
 
 
 @router.get("/api/calendar/todos")
@@ -54,7 +41,7 @@ def get_todo(authentication: Authentication, todo_id: int):
     res = cursor.fetchone()
     if res["user_id"] != authentication.user_id:
         raise HTTPException(detail="User is not authenticated to access this resource", status_code=401)
-    return res, 200
+    return res
 
 
 @router.get("/api/calendar/todos")
@@ -83,7 +70,7 @@ def get_todos(authentication: Authentication, start_day: float, end_day: Optiona
         stmt += f"SELECT * FROM todos WHERE todo_id = {todo_id};"
     cursor.execute(stmt, multi=True)
     res = cursor.fetchall()
-    return {"todos": res}, 200
+    return {"todos": res}
 
 
 @router.put("/api/calendar/todos/{todo_id}")
@@ -105,7 +92,6 @@ def update_calendar_todo(authentication: Authentication, todo_id: int, todo: ToD
         cursor.execute(query, params)  # add back to todos_in_day
 
     # yuhhhhhh
-    return 200
 
 
 @router.delete("/api/calendar/todos/{todo_id}")
@@ -113,7 +99,7 @@ def delete_todo(authentication: Authentication, todo_id: int):
     get_todo(authentication, todo_id)  # authenticate
     cursor.execute("DELETE FROM todos WHERE todo_id = %s", (todo_id,))
     cursor.execute("DELETE FROM todos_in_day WHERE todo_id = %s", (todo_id,))
-    return f"successfully deleted todo with id: '{todo_id}'", 200
+    return f"successfully deleted todo with id: '{todo_id}'"
 
 
 @router.delete("/api/calendar/todos")

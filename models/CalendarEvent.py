@@ -6,12 +6,12 @@ import datetime
 
 
 class CalendarEvent(BaseModel):
-
     eventId: Optional[int]
     userId: Optional[int]
     name: Optional[str]
     description: Optional[str]
-    isHidden: Optional[bool] = False # we use hidden events when completing todo items but don't want it to appear on calendar
+    isHidden: Optional[
+        bool] = False  # we use hidden events when completing todo items but don't want it to appear on calendar
 
     startInstant: Optional[float]
     endInstant: Optional[float]
@@ -22,27 +22,28 @@ class CalendarEvent(BaseModel):
     recurrenceId: Optional[int]
 
     def get_sql_events_insert_query(self):
-        return "INSERT INTO events (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
+        return "INSERT INTO events VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
 
     def get_sql_insert_params(self):
-        return (self.userId,
-             self.name,
-             self.description,
-             self.isHidden,
-             self.startInstant,
-             self.endInstant,
-             self.duration,
+        return (None,
+                self.userId,
+                self.name,
+                self.description,
+                self.isHidden,
+                self.startInstant,
+                self.endInstant,
+                self.duration,
 
-             self.linkedGoalId,
-             self.linkedTodoId,
-             self.recurrenceId)
+                self.linkedGoalId,
+                self.linkedTodoId,
+                self.recurrenceId)
 
     def get_sql_events_in_day_insert_query_and_params(self):
         days = CalendarEvent.get_days_in_range(self.startInstant, self.endInstant)
         values_str = ""
         for day in days:
             values_str += (",(%s, %s, %s)" % day, self.eventId, self.userId)
-        return "INSERT INTO events_in_day (day, event_id, user_id) VALUES %s, ;", (values_str[1:])
+        return "INSERT INTO events_in_day VALUES (day, event_id, user_id) VALUES %s, ;", (values_str[1:])
 
     @staticmethod
     def get_days_in_range(start: float, end: float):  # is inclusive
