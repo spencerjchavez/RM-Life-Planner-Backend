@@ -79,6 +79,8 @@ def is_username_in_use(username: str):
 def login_user(username: str, password: str):
     cursor.execute("SELECT * FROM users WHERE username = %s;", (username,))
     res = cursor.fetchone()
+    if res is None:
+        raise HTTPException(status_code=404, detail="username or password is incorrect")
     password = password.encode("utf-8")
     salt = res["salt"]
     hashed_password = bcrypt.hashpw(password, salt)
@@ -89,7 +91,7 @@ def login_user(username: str, password: str):
 
 
 @router.post("/api/users/logout/{user_id}")
-def logout_user(authentication: Authentication, user_id: int):
+def logout_user(user_id: int, authentication: Authentication):
     user_id = authentication.user_id
     if not authenticate(authentication):
         raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
@@ -98,26 +100,35 @@ def logout_user(authentication: Authentication, user_id: int):
 
 
 @router.get("/api/users/{user_id}")
-def get_user(authentication: Authentication, user_id):
+def get_user(authentication: Authentication, user_id: int):
     user_id = authentication.user_id
     if not authenticate(authentication):
         raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
-    cursor.execute("SELECT * FROM users WHERE user_id = %s;", (user_id.__str__(),))
+    cursor.execute("SELECT * FROM users WHERE user_id = %s;", (user_id,))
     user = cursor.fetchone()
     if user["user_id"] != user_id or authentication.user_id != user_id:
         raise HTTPException(status_code=401, detail="User is not authenticated to access this resource")
-    # Don't return user's salt or hashed_password
-    user["salt"] = None
-    user["hashed_password"] = None
-    return {"message": "successfully got user", "user": user}
+    return {"message": "successfully got user", "user": User.from_sql_res(user)}
+
+
+def get_user_with_login_info(user_id: int):
+    cursor.execute("SELECT * FROM users WHERE user_id = %s;", (user_id,))
+    return cursor.fetchone()
 
 
 @router.put("/api/users/{user_id}")
 def update_user(authentication: Authentication, user_id: int, updated_user: User):
-    res = get_user(authentication)
-    original_user_dict = res["user"]
-    # make sure the user isn't changing any properties they aren't allowed to
-    cursor.execute("UPDATE users SET (password = %s, email = %s, google_calendar_id = %s)", (updated_user.password, updated_user.email, updated_user.googleCalendarId))
+    if not authenticate(authentication):
+        raise HTTPException(status_code=401, detail="User could not be authenticatied, please log in")
+    res = get_user_with_login_info(user_id)
+    if updated_user.password is not None:
+        updated_user.hashedPassword = bcrypt.hashpw(updated_user.password.encode("utf-8"),
+                                                    res["salt"])
+    cursor.execute("UPDATE users SET hashed_password = %s, email = %s, google_calendar_id = %s WHERE user_id = %s;",
+                   (updated_user.hashedPassword or res["hashed_password"],
+                    updated_user.email or res["email"],
+                    updated_user.googleCalendarId or res["google_calendar_id"],
+                    user_id))
     return "successfully updated"
 
 @router.delete("/api/users/{user_id}")

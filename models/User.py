@@ -1,5 +1,6 @@
 from typing import Optional
 from pydantic import BaseModel
+from models.SQLColumnNames import *
 
 
 class User(BaseModel):
@@ -24,3 +25,11 @@ class User(BaseModel):
                 self.email,
                 self.googleCalendarId
                 )
+
+    @staticmethod
+    def from_sql_res(src: dict):
+        return User(username=src[USERNAME],
+                    dateJoined=src["date_joined"],
+                    email=src[EMAIL],
+                    googleCalendarId=src[GOOGLE_CALENDAR_ID]
+                    )

@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from mysql.connector.cursor import MySQLCursor, Error
 from models.CalendarEvent import CalendarEvent
 from models.Authentication import Authentication
-from models.SQLColumnNames import SQLColumnNames as _
+from models.SQLColumnNames import *
 from endpoints import UserEndpoints, RecurrenceEndpoints
 
 
@@ -76,14 +76,14 @@ def update_calendar_event(authentication: Authentication, event_id: int, event: 
     if res["start_instant"] != event.startInstant or res["end_instant"] != event.endInstant:
         time_changed = True
     cursor.execute("UPDATE events SET %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s WHERE event_id = %s",
-                                          (_.NAME, event.name,
-                                           _.DESCRIPTION, event.description,
-                                           _.IS_HIDDEN, event.isHidden,
-                                           _.START_INSTANT, event.startInstant,
-                                           _.END_INSTANT, event.endInstant,
-                                           _.DURATION, event.duration,
-                                           _.LINKED_GOAL_ID, event.linkedGoalId,
-                                           _.LINKED_TODO_ID, event.linkedTodoId,
+                                          (NAME, event.name,
+                                           DESCRIPTION, event.description,
+                                           IS_HIDDEN, event.isHidden,
+                                           START_INSTANT, event.startInstant,
+                                           END_INSTANT, event.endInstant,
+                                           DURATION, event.duration,
+                                           LINKED_GOAL_ID, event.linkedGoalId,
+                                           LINKED_TODO_ID, event.linkedTodoId,
                                            event_id))
     if time_changed:
         cursor.execute("DELETE FROM events_in_day WHERE event_id = %s", (event_id,))

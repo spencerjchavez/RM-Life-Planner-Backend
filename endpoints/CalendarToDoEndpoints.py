@@ -7,7 +7,7 @@ import mysql
 from mysql.connector.cursor import MySQLCursor, Error
 from models.ToDo import ToDo
 from models.Authentication import Authentication
-from models.SQLColumnNames import SQLColumnNames as _
+from models.SQLColumnNames import *
 from endpoints import UserEndpoints, RecurrenceEndpoints
 
 # TODO: make sure IN ALL ENDPOINTS when a user creates a resource the user_id matches
@@ -77,14 +77,14 @@ def get_todos(authentication: Authentication, start_day: float, end_day: Optiona
 def update_calendar_todo(authentication: Authentication, todo_id: int, todo: ToDo):
     res = get_todo(authentication, todo_id)
     time_changed = False
-    if res["start_instant"] != todo.startInstant or res[_.TIMEFRAME] != todo.timeframe:
+    if res["start_instant"] != todo.startInstant or res[TIMEFRAME] != todo.timeframe:
         time_changed = True
     cursor.execute(
         "UPDATE todos SET %s = %s, %s = %s, %s = %s, %s = %s WHERE todo_id = %s",
-        (_.NAME, todo.name,
-         _.START_INSTANT, todo.startInstant,
-         _.TIMEFRAME, todo.timeframe,
-         _.LINKED_GOAL_ID, todo.linkedGoalId,
+        (NAME, todo.name,
+         START_INSTANT, todo.startInstant,
+         TIMEFRAME, todo.timeframe,
+         LINKED_GOAL_ID, todo.linkedGoalId,
          todo_id))
     if time_changed:
         cursor.execute("DELETE FROM todos_in_day WHERE todo_id = %s", (todo_id,))

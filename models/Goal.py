@@ -2,6 +2,7 @@
 from typing import Optional
 from pydantic import BaseModel
 from enum import Enum
+from models.SQLColumnNames import *
 
 
 class Goal(BaseModel):
@@ -39,3 +40,18 @@ class Goal(BaseModel):
                 self.endInstant,
                 self.recurrenceId,
                 self.timeframe)
+
+    @staticmethod
+    def from_sql_res(src: dict):
+        return Goal(
+            goalId=src[GOAL_ID],
+            desireId=src[DESIRE_ID],
+            userId=src[USER_ID],
+            name=src[NAME],
+            howMuch=src[HOW_MUCH],
+            measuringUnits=src[MEASURING_UNITS],
+            startInstant=src[START_INSTANT],
+            endInstant=src[END_INSTANT],
+            recurrenceId=src[RECURRENCE_ID],
+            timeframe=src[TIMEFRAME]
+        )

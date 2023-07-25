@@ -5,6 +5,7 @@ from models.CalendarEvent import CalendarEvent
 from enum import Enum
 import datetime
 from dateutil.relativedelta import relativedelta
+from models.SQLColumnNames import *
 
 
 class ToDo(BaseModel):
@@ -55,3 +56,13 @@ class ToDo(BaseModel):
         for day in days:
             values_str += f"({day}, {self.todoId}, {self.userId}) "
         return "INSERT INTO events_in_day VALUES (day, event_id, user_id) VALUES %s, ;", values_str[1:]
+
+    @staticmethod
+    def from_sql_res(src: dict):
+        return ToDo(todoId=src["todo_id"],
+                    userID=src[USER_ID],
+                    name=src[NAME],
+                    timeframe=src[TIMEFRAME],
+                    startInstant=src[START_INSTANT],
+                    recurrenceId=src[RECURRENCE_ID],
+                    linkedGoalId=src[LINKED_GOAL_ID])

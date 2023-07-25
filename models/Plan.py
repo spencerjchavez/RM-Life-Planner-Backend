@@ -1,6 +1,7 @@
 # CREATED JUNE OF 2023 BY SPENCER CHAVEZ
 from typing import Optional
 from pydantic import BaseModel
+from models.SQLColumnNames import *
 
 
 class Plan(BaseModel):
@@ -19,3 +20,12 @@ class Plan(BaseModel):
                 self.goalId,
                 self.eventId,
                 self.howMuch)
+
+    @staticmethod
+    def from_sql_res(src: dict):
+        return Plan(
+            planId=src["plan-id"],
+            userId=src[USER_ID],
+            goalId=src[GOAL_ID],
+            eventId=src["event_id"],
+            howMuch=src[HOW_MUCH])

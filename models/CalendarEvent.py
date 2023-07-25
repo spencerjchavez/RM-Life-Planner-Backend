@@ -3,6 +3,7 @@
 from pydantic import BaseModel
 from typing import Optional
 import datetime
+from models.SQLColumnNames import *
 
 
 class CalendarEvent(BaseModel):
@@ -54,3 +55,20 @@ class CalendarEvent(BaseModel):
             days.append(dt.timestamp())
             dt += datetime.timedelta(days=1)
         return [days]
+
+    @staticmethod
+    def from_sql_res(src: dict):
+        return CalendarEvent(
+            eventId=src["event_id"],
+            userId=src[USER_ID],
+            name=src[NAME],
+            description=src[DESCRIPTION],
+            isHidden=src[IS_HIDDEN],
+            startInstant=src[START_INSTANT],
+            endInstant=src[END_INSTANT],
+            duration=src[DURATION],
+
+            linkedGoalId=src[LINKED_GOAL_ID],
+            linkedTodoId=src[LINKED_TODO_ID],
+            recurrenceId=src[RECURRENCE_ID]
+        )

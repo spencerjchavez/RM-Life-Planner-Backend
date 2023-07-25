@@ -2,6 +2,7 @@
 from typing import Optional
 from pydantic import BaseModel
 from enum import Enum
+from models.SQLColumnNames import *
 
 
 class Action(BaseModel):
@@ -31,3 +32,15 @@ class Action(BaseModel):
                 self.successful,
                 self.howMuchAccomplished,
                 self.notes)
+
+    @staticmethod
+    def from_sql_res(src: dict):
+        return Action(
+            planId=src["plan_id"],
+            eventId=src["event_id"],
+            goalId=src[GOAL_ID],
+            userId=src[USER_ID],
+            successful=src[SUCCESSFUL],
+            howMuchAccomplished=src[HOW_MUCH_ACCOMPLISHED],
+            notes=src[NOTES]
+        )

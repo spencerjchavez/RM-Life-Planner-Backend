@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from models.Authentication import Authentication
 import mysql
 from mysql.connector.connection import MySQLCursor, Error
-from models.SQLColumnNames import SQLColumnNames as _
+from models.SQLColumnNames import *
 from datetime import datetime, timedelta
 from dateutil import relativedelta
 from models.CalendarEvent import CalendarEvent
@@ -75,10 +75,10 @@ def set_recurrence_end(authentication: Authentication, recurrence_id: int, end: 
     res = cursor.fetchone()
     if res["user_id"] != authentication.user_id:
         raise HTTPException(status_code=401, detail="User is not authenticated to modify this resource")
-    rule = rrulestr(res[_.RRULE_STRING])
+    rule = rrulestr(res[RRULE_STRING])
     rule = rule.replace(until=datetime.fromtimestamp(end))
     cursor.execute("UPDATE recurrences SET %s = %s WHERE recurrence_id = %s",
-                   (_.RRULE_STRING, str(rule), recurrence_id))
+                   (RRULE_STRING, str(rule), recurrence_id))
 
 
 @router.delete("/api/recurrences/{recurrence_id}")
@@ -93,11 +93,11 @@ def delete_recurrences_after_date(authentication: Authentication, recurrence_id,
                                   inclusive: bool):
     get_recurrence(authentication, recurrence_id)  # authenticate
     cursor.execute("DELETE FROM goals WHERE recurrence_id = %s AND %s %s %s;",
-                   (recurrence_id, _.START_INSTANT, ">=" if inclusive else ">", after))
+                   (recurrence_id, START_INSTANT, ">=" if inclusive else ">", after))
     cursor.execute("DELETE FROM todos WHERE recurrence_id = %s AND %s %s %s;",
-                   (recurrence_id, _.START_INSTANT, ">=" if inclusive else ">", after))
+                   (recurrence_id, START_INSTANT, ">=" if inclusive else ">", after))
     cursor.execute("DELETE FROM events WHERE recurrence_id = %s AND %s %s %s",
-                   (recurrence_id, _.START_INSTANT, ">=" if inclusive else ">", after))
+                   (recurrence_id, START_INSTANT, ">=" if inclusive else ">", after))
     set_recurrence_end(authentication, recurrence_id, after)
 
 
@@ -111,7 +111,7 @@ def __generate_recurrence_instances_for_month(authentication: Authentication, ye
     cursor.execute("SELECT * FROM recurrences WHERE user_id = %s", (authentication.user_id,))
     res = cursor.fetchall()
     for row in res:
-        rrule_str = row[_.RRULE_STRING]
+        rrule_str = row[RRULE_STRING]
         rule = rrulestr(rrule_str)
         start_dt = datetime(year=year, month=month, day=1, hour=0, minute=0, second=0, microsecond=0)
         end_dt = start_dt + relativedelta.relativedelta(months=1) - timedelta(minutes=1)
@@ -124,29 +124,29 @@ def __generate_recurrence_instances_for_month(authentication: Authentication, ye
 
 def __generate_recurrence_instance(authentication: Authentication, recurrence_dict: {}, dt: datetime):
     goal_id = None
-    if recurrence_dict[_.RECURRENCE_GOAL_NAME] is not None:
+    if recurrence_dict[RECURRENCE_GOAL_NAME] is not None:
         goal = Goal()
-        goal.name = recurrence_dict[_.RECURRENCE_GOAL_NAME]
+        goal.name = recurrence_dict[RECURRENCE_GOAL_NAME]
         goal.userId = recurrence_dict["user_id"]
-        goal.desireId = recurrence_dict[_.RECURRENCE_GOAL_DESIRE_ID]
-        goal.howMuch = recurrence_dict[_.RECURRENCE_GOAL_HOW_MUCH]
-        goal.measuringUnits = recurrence_dict[_.RECURRENCE_GOAL_MEASURING_UNITS]
-        goal.timeframe = recurrence_dict[_.RECURRENCE_GOAL_TIMEFRAME]
+        goal.desireId = recurrence_dict[RECURRENCE_GOAL_DESIRE_ID]
+        goal.howMuch = recurrence_dict[RECURRENCE_GOAL_HOW_MUCH]
+        goal.measuringUnits = recurrence_dict[RECURRENCE_GOAL_MEASURING_UNITS]
+        goal.timeframe = recurrence_dict[RECURRENCE_GOAL_TIMEFRAME]
         goal.startInstant = dt.timestamp()
-        goal.recurrenceId = recurrence_dict[_.RECURRENCE_ID]
+        goal.recurrenceId = recurrence_dict[RECURRENCE_ID]
         # create goal
         cursor.execute(
             goal.get_sql_insert_query(),
             goal.get_sql_insert_params())
 
     todo_id = None
-    if recurrence_dict[_.RECURRENCE_TODO_NAME] is not None:
+    if recurrence_dict[RECURRENCE_TODO_NAME] is not None:
         todo = ToDo()
-        todo.name = recurrence_dict[_.RECURRENCE_TODO_NAME]
-        todo.recurrenceId = recurrence_dict[_.RECURRENCE_ID]
-        todo.userId = recurrence_dict[_.USER_ID]
+        todo.name = recurrence_dict[RECURRENCE_TODO_NAME]
+        todo.recurrenceId = recurrence_dict[RECURRENCE_ID]
+        todo.userId = recurrence_dict[USER_ID]
         todo.startInstant = dt.timestamp()
-        todo.timeframe = recurrence_dict[_.RECURRENCE_TODO_TIMEFRAME]
+        todo.timeframe = recurrence_dict[RECURRENCE_TODO_TIMEFRAME]
         if goal_id is not None:
             todo.linkedGoalId = goal_id
         # create to-do
@@ -156,15 +156,15 @@ def __generate_recurrence_instance(authentication: Authentication, recurrence_di
         # insert into events_by_user_day
         stmt, params = todo.get_sql_todos_in_day_insert_query_and_params()
         cursor.execute(stmt, params)
-    if recurrence_dict[_.RECURRENCE_EVENT_NAME] is not None:
+    if recurrence_dict[RECURRENCE_EVENT_NAME] is not None:
         event = CalendarEvent()
-        event.name = recurrence_dict[_.RECURRENCE_EVENT_NAME]
-        event.description = recurrence_dict[_.RECURRENCE_EVENT_DESCRIPTION]
+        event.name = recurrence_dict[RECURRENCE_EVENT_NAME]
+        event.description = recurrence_dict[RECURRENCE_EVENT_DESCRIPTION]
         event.startInstant = dt.timestamp()
-        event.endInstant = event.startInstant + recurrence_dict[_.RECURRENCE_EVENT_DURATION]
-        event.duration = recurrence_dict[_.RECURRENCE_EVENT_DURATION]
+        event.endInstant = event.startInstant + recurrence_dict[RECURRENCE_EVENT_DURATION]
+        event.duration = recurrence_dict[RECURRENCE_EVENT_DURATION]
         event.userId = authentication.user_id
-        event.recurrenceId = recurrence_dict[_.RECURRENCE_ID]
+        event.recurrenceId = recurrence_dict[RECURRENCE_ID]
         if goal_id is not None:
             event.linkedGoalId = goal_id
         if todo_id is not None:

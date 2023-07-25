@@ -7,8 +7,8 @@ from models.Goal import Goal
 from models.Action import Action
 from endpoints import UserEndpoints
 from models.Authentication import Authentication
-from models.SQLColumnNames import SQLColumnNames as _
-import mysql
+from models.SQLColumnNames import *
+import time
 from mysql.connector.cursor import MySQLCursor, Error
 
 
@@ -35,6 +35,7 @@ def create_desire(authentication: Authentication, desire: Desire):
     if user_id != desire.userId:
         raise HTTPException(detail="bruh are you seriously trying to troll me rn? #nicetry #reported #getrekt", status_code=401)
 
+    desire.dateCreated = time.time()
     query = desire.get_sql_insert_query()
     params = desire.get_sql_insert_params()
     cursor.execute(query, params)
@@ -58,7 +59,7 @@ def get_desire(authentication: Authentication, desire_id: int):
 @router.put("/api/desires/{desire_id}")
 def update_desire(authentication: Authentication, desire_id: int, updated_desire: Desire):
     get_desire(desire_id)
-    query = f"UPDATE desires SET {_.NAME} = %s, {_.DEADLINE} = %s, {_.DATE_RETIRED} = %s, {_.PRIORITY_LEVEL} = %s,  {_.COLOR_R} = %s, {_.COLOR_G} = %s, {_.COLOR_B} = %s WHERE desire_id = %s"
+    query = f"UPDATE desires SET {NAME} = %s, {DEADLINE} = %s, {DATE_RETIRED} = %s, {PRIORITY_LEVEL} = %s,  {COLOR_R} = %s, {COLOR_G} = %s, {COLOR_B} = %s WHERE desire_id = %s"
     params = (updated_desire.name, updated_desire.deadline, updated_desire.dateRetired, updated_desire.priorityLevel, updated_desire.colorR, updated_desire.colorG, updated_desire.colorB, desire_id)
     cursor.execute(query, params)
     return f"Desire with ID {desire_id} updated successfully"
