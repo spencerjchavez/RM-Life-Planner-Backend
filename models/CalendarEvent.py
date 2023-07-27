@@ -11,8 +11,7 @@ class CalendarEvent(BaseModel):
     userId: Optional[int]
     name: Optional[str]
     description: Optional[str]
-    isHidden: Optional[
-        bool] = False  # we use hidden events when completing todo items but don't want it to appear on calendar
+    isHidden: Optional[bool] = False  # we use hidden events when completing todo items but don't want it to appear on calendar
 
     startInstant: Optional[float]
     endInstant: Optional[float]

@@ -1,42 +1,22 @@
 from models.ToDo import ToDo
+from testing.sample_objects.goal_achieving.goals import *
 
-TODO_INDEFINITE1 = ToDo(
-  name=,
-  timeframe= 0,
-  startInstant=
+APPLY_10_JOBS_TODO = ToDo(
+  name=APPLY_FOR_JOB_GOAL.name,
+  startInstant=time.time(),
+  deadline=APPLY_FOR_JOB_GOAL.deadline
 )
-TODO_INDEFINITE2 = ToDo(
-  name=,
-  timeframe= 0,
-  startInstant=
+DO_HOMEWORK_TODO = ToDo(
+  name=DO_HOMEWORK_GOAL.name,
+  startInstant=time.time(),
+  deadline=DO_HOMEWORK_GOAL.deadline
 )
-TODO_INDEFINITE3 = ToDo(
-  name=,
-  timeframe= 0,
-  startInstant=
+READ_SCRIPTURES_TODO = ToDo(
+  name=READ_SCRIPTURES_GOAL.name,
+  startInstant=time.time(),
+  deadline=READ_SCRIPTURES_GOAL.deadline
 )
-TODO_DAY1 = ToDo(
-  name=,
-  timeframe= 1,
-  startInstant=
+GO_TO_STORE_TODO = ToDo(
+  name="go to the store today",
+  startInstant=time.time()
 )
-TODO_DAY2 = ToDo(
-  name=,
-  timeframe= 1,
-  startInstant=
-)
-TODO_WEEK1 = ToDo(
-  name=,
-  timeframe= 2,
-  startInstant=
-)
-TODO_MONTH1 = ToDo(
-  name=,
-  timeframe= 3,
-  startInstant=
-)
-TODO_YEAR1 = ToDo(
-  name=,
-  timeframe= 4,
-  startInstant=
-}

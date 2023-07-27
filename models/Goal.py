@@ -20,8 +20,7 @@ class Goal(BaseModel):
     howMuch: Optional[int]
     measuringUnits: Optional[str]
     startInstant: Optional[float]
-    endInstant: Optional[
-        float]  # null == goal is indefinite. This parameter is overridden by timeframe in recurring goals
+    deadline: Optional[float]  # null == goal is indefinite. This parameter is overridden by timeframe in recurring goals
     # recurring goal stuff
     recurrenceId: Optional[int]
     timeframe: Optional[Timeframe]
@@ -37,7 +36,7 @@ class Goal(BaseModel):
                 self.howMuch,
                 self.measuringUnits,
                 self.startInstant,
-                self.endInstant,
+                self.deadline,
                 self.recurrenceId,
                 self.timeframe)
 
@@ -51,7 +50,7 @@ class Goal(BaseModel):
             howMuch=src[HOW_MUCH],
             measuringUnits=src[MEASURING_UNITS],
             startInstant=src[START_INSTANT],
-            endInstant=src[END_INSTANT],
+            deadline=src[DEADLINE],
             recurrenceId=src[RECURRENCE_ID],
             timeframe=src[TIMEFRAME]
         )

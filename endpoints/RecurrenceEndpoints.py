@@ -22,12 +22,14 @@ months_accessed_cache: {int: {int: {int: bool}}}  # user_id, year, month, if mon
 # TODO: VALIDATE INPUT FOR RECURRENCE OBJECTS
 
 
-@router.post("/api/recurrences")
+@router.post("/api/calendar/recurrences")
 def create_recurrence(authentication: Authentication, recurrence: Recurrence):
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
     if recurrence.userId != authentication.user_id:
         raise HTTPException(status_code=401, detail="User is not authenticated to create this resource")
+    if recurrence.goalName is not None and recurrence.todoName is None:
+        raise HTTPException(status_code=400, detail="Todo must be created if a goal is defined")
     if recurrence.seriesId is None:
         cursor.execute("INSERT INTO series () VALUES ();")
         recurrence.seriesId = cursor.lastrowid
@@ -38,7 +40,7 @@ def create_recurrence(authentication: Authentication, recurrence: Recurrence):
     return recurrence.recurrenceId
 
 
-@router.get("/api/recurrences/{recurrence_id}")
+@router.get("/api/calendar/recurrences/{recurrence_id}")
 def get_recurrence(authentication: Authentication, recurrence_id: int):
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
@@ -49,7 +51,7 @@ def get_recurrence(authentication: Authentication, recurrence_id: int):
     return res
 
 
-@router.put("/api/recurrences/{recurrence_id}")
+@router.put("/api/calendar/recurrences/{recurrence_id}")
 def update_recurrence(authentication: Authentication, recurrence_id: int, recurrence: Recurrence,
                       after: float,
                       inclusive: bool):
@@ -67,7 +69,7 @@ def update_recurrence(authentication: Authentication, recurrence_id: int, recurr
     generate_recurrence_instances_for_new_recurrence(authentication, recurrence)
 
 
-@router.put("/api/recurrences/{recurrence_id}")
+@router.put("/api/calendar/recurrences/{recurrence_id}")
 def set_recurrence_end(authentication: Authentication, recurrence_id: int, end: float):
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
@@ -81,14 +83,14 @@ def set_recurrence_end(authentication: Authentication, recurrence_id: int, end: 
                    (RRULE_STRING, str(rule), recurrence_id))
 
 
-@router.delete("/api/recurrences/{recurrence_id}")
+@router.delete("/api/calendar/recurrences/{recurrence_id}")
 def delete_recurrence(authentication: Authentication, recurrence_id: int):
     get_recurrence(authentication, recurrence_id)  # authentication
     cursor.execute("DELETE FROM recurrences WHERE recurrence_id = %s", (recurrence_id,))
     return "recurrence successfully deleted"
 
 
-@router.delete("/api/recurrences/{recurrence_id}")
+@router.delete("/api/calendar/recurrences/{recurrence_id}")
 def delete_recurrences_after_date(authentication: Authentication, recurrence_id, after: float,
                                   inclusive: bool):
     get_recurrence(authentication, recurrence_id)  # authenticate

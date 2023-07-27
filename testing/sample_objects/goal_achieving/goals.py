@@ -1,6 +1,5 @@
 import datetime
 from models.Goal import Goal
-from models.Goal import Goal
 import time
 
 APPLY_FOR_JOB_GOAL = Goal(

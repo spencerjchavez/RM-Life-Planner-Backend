@@ -20,22 +20,24 @@ class ToDo(BaseModel):
     userId: Optional[int]
 
     name: Optional[str]
-    timeframe: Optional[Timeframe]
     startInstant: Optional[float]
+    deadline: Optional[float]  # overridden by timeframe in recurring ToDos
 
     recurrenceId: Optional[int]
+    timeframe: Optional[Timeframe]
     linkedGoalId: Optional[int]
 
     def get_sql_insert_query(self):
-        return "INSERT INTO todos VALUES (%s, %s, %s, %s, %s, %s, %s);"
+        return "INSERT INTO todos VALUES (%s, %s, %s, %s, %s, %s, %s, %s);"
 
     def get_sql_insert_params(self):
         return (None,
                 self.userId,
                 self.name,
-                self.timeframe,
                 self.startInstant,
+                self.deadline,
                 self.recurrenceId,
+                self.timeframe,
                 self.linkedGoalId)
 
     def get_sql_todos_in_day_insert_query_and_params(self):
@@ -62,7 +64,8 @@ class ToDo(BaseModel):
         return ToDo(todoId=src["todo_id"],
                     userID=src[USER_ID],
                     name=src[NAME],
-                    timeframe=src[TIMEFRAME],
                     startInstant=src[START_INSTANT],
+                    deadline=src[DEADLINE],
                     recurrenceId=src[RECURRENCE_ID],
+                    timeframe=src[TIMEFRAME],
                     linkedGoalId=src[LINKED_GOAL_ID])

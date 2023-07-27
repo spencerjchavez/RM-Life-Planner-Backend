@@ -90,7 +90,7 @@ name varchar(42) not null,
 how_much int,
 measuring_units varchar(12),
 start_instant bigint not null,
-end_instant bigint, -- null == goal is indefinite. This parameter is overridden by timeframe in recurring goals
+deadline bigint, -- null == goal is indefinite. This parameter is overridden by timeframe in recurring goals
 -- recurring goal stuff
 recurrence_id bigint unsigned,
 timeframe int, -- can be a day, a week, or a month in length, depending on rrule
@@ -107,10 +107,11 @@ todo_id bigint unsigned primary key not null auto_increment,
 user_id int unsigned not null,
 
 name varchar(32),
-timeframe int not null, -- todos can either span indefinitely, for a day, week, or month. timeframe specifies this
 start_instant bigint not null,
+deadline bigint,
 
 recurrence_id bigint unsigned,
+timeframe int not null, -- todos can either span indefinitely, for a day, week, or month. timeframe specifies this
 linked_goal_id bigint unsigned,
 
 FOREIGN KEY (linked_goal_id) REFERENCES goals(goal_id),
