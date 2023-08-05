@@ -108,7 +108,7 @@ def get_user(authentication: Authentication, user_id: int):
     user = cursor.fetchone()
     if user["user_id"] != user_id or authentication.user_id != user_id:
         raise HTTPException(status_code=401, detail="User is not authenticated to access this resource")
-    return {"message": "successfully got user", "user": User.from_sql_res(user)}
+    return {"message": "successfully got user", "user": User.from_sql_res(user.__dict__)}
 
 
 def get_user_with_login_info(user_id: int):
@@ -143,6 +143,7 @@ def delete_user(authentication: Authentication, user_id: int):
     cursor.execute("DELETE FROM events_in_day WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM events WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM alerts WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM goals_in_day WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM goals WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM recurrences WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM desires WHERE user_id = %s", (user_id,))

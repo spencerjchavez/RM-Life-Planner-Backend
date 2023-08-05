@@ -28,28 +28,9 @@ class CalendarEndpointsTest:
         # self.alert_tests = AlertTests(self.alerts_url)
 
     def launch_test(self):
-
-
         # TEST CALENDAR EVENTS
-        self.calendar_event_tests.launch_tests()
+        self.calendar_event_tests.launch_test()
+        self.todo_tests.launch_test()
+        self.recurrence_tests.launch_test()
 
-
-
-        # TEST TODOS
-
-
-        # TEST LINKING TODOS AND EVENTS
-
-
-        # TEST RECURRENCES
-        # 1. RECURRING TODOS
-
-
-        # 2. RECURRING GOALS / TODOS
-
-
-        # 3. RECURRING EVENTS
-
-
-        # 4. RECURRING GOALS / TODOS/ EVENTS
-
+        # tests with the 3 combined

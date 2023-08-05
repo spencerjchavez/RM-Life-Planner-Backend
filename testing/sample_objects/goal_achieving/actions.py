@@ -1,8 +1,5 @@
 from models.Action import Action
 
-UNREPORTED_ACTION = Action(
-  successful=Action.Success.UNKNOWN
-)
 PARTIAL_ACTION = Action(
   successful=Action.Success.PARTIAL,
   howMuchAccomplished=1,

@@ -20,9 +20,10 @@ class CalendarEvent(BaseModel):
     linkedGoalId: Optional[int]
     linkedTodoId: Optional[int]
     recurrenceId: Optional[int]
+    recurrenceDay: Optional[float]  # the day of the recurrence instance (user may modify the actual startInstance later, but this value won't change)
 
     def get_sql_events_insert_query(self):
-        return "INSERT INTO events VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
+        return "INSERT INTO events VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
 
     def get_sql_insert_params(self):
         return (None,
@@ -36,7 +37,8 @@ class CalendarEvent(BaseModel):
 
                 self.linkedGoalId,
                 self.linkedTodoId,
-                self.recurrenceId)
+                self.recurrenceId,
+                self.recurrenceDay)
 
     def get_sql_events_in_day_insert_query_and_params(self):
         days = CalendarEvent.get_days_in_range(self.startInstant, self.endInstant)
@@ -69,5 +71,6 @@ class CalendarEvent(BaseModel):
 
             linkedGoalId=src[LINKED_GOAL_ID],
             linkedTodoId=src[LINKED_TODO_ID],
-            recurrenceId=src[RECURRENCE_ID]
+            recurrenceId=src[RECURRENCE_ID],
+            recurrenceDay=src[RECURRENCE_DAY]
         )

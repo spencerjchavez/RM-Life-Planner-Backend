@@ -9,22 +9,16 @@ from models.SQLColumnNames import *
 
 
 class ToDo(BaseModel):
-    class Timeframe(Enum):
-        INDEFINITE = 0
-        DAY = 1
-        WEEK = 2
-        MONTH = 3
-        YEAR = 4
 
     todoId: Optional[str]
     userId: Optional[int]
 
     name: Optional[str]
     startInstant: Optional[float]
-    deadline: Optional[float]  # overridden by timeframe in recurring ToDos
+    endInstant: Optional[float]  # overridden by timeframe in recurring ToDos
 
     recurrenceId: Optional[int]
-    timeframe: Optional[Timeframe]
+    recurrenceDay: Optional[float]  # the day of the recurrence instance (user may modify the actual startInstance later, but this value won't change)
     linkedGoalId: Optional[int]
 
     def get_sql_insert_query(self):
@@ -35,29 +29,19 @@ class ToDo(BaseModel):
                 self.userId,
                 self.name,
                 self.startInstant,
-                self.deadline,
+                self.endInstant,
                 self.recurrenceId,
-                self.timeframe,
+                self.recurrenceDay,
                 self.linkedGoalId)
 
     def get_sql_todos_in_day_insert_query_and_params(self):
-        # INDEFINITE timeframe todos do not appear in todos_in_day, as they are not bounded to any timeframe, but will simply disappear when they are completed
-        if self.timeframe == self.Timeframe.INDEFINITE:
-            return
-        end_instant: datetime
-        if self.timeframe == self.Timeframe.DAY:
-            end_instant = datetime.datetime.fromtimestamp(self.startInstant) + datetime.timedelta(days=1)
-        elif self.timeframe == self.Timeframe.WEEK:
-            end_instant = datetime.datetime.fromtimestamp(self.startInstant) + datetime.timedelta(days=7)
-        elif self.timeframe == self.Timeframe.MONTH:
-            end_instant = datetime.datetime.fromtimestamp(self.startInstant) + relativedelta(months=1)
-        else:  # self.timeframe == self.Timeframe.YEAR:
-            end_instant = datetime.datetime.fromtimestamp(self.startInstant) + relativedelta(years=1)
-        days = CalendarEvent.get_days_in_range(self.startInstant, end_instant.timestamp())
+        if self.endInstant is None:
+            raise ValueError()
+        days = CalendarEvent.get_days_in_range(self.startInstant, self.endInstant)
         values_str = ""
         for day in days:
             values_str += f"({day}, {self.todoId}, {self.userId}) "
-        return "INSERT INTO events_in_day VALUES (day, event_id, user_id) VALUES %s, ;", values_str[1:]
+        return "INSERT INTO todos_in_day VALUES (day, todo_id, user_id) VALUES %s, ;", values_str[1:]
 
     @staticmethod
     def from_sql_res(src: dict):
@@ -65,7 +49,8 @@ class ToDo(BaseModel):
                     userID=src[USER_ID],
                     name=src[NAME],
                     startInstant=src[START_INSTANT],
-                    deadline=src[DEADLINE],
+                    endInstant=src[END_INSTANT],
                     recurrenceId=src[RECURRENCE_ID],
-                    timeframe=src[TIMEFRAME],
-                    linkedGoalId=src[LINKED_GOAL_ID])
+                    recurrenceDay=src[RECURRENCE_DAY],
+                    linkedGoalId=src[LINKED_GOAL_ID]
+                    )

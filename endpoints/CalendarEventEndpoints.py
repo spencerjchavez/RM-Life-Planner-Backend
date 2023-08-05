@@ -41,56 +41,65 @@ def get_calendar_event(authentication: Authentication, event_id: int):
 
 
 @router.get("/api/calendar/events")
-def get_calendar_events(authentication: Authentication, start_day: float, end_day: Optional[float] = None):
+def get_calendar_events(authentication: Authentication, days: list[float]):
     if not UserEndpoints.authenticate(authentication):
-        raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
+        raise HTTPException(detail="User is not authenticatied, please log in", status_code=401)
+    in_clause = ""
+    year_months = set()
+    for day in days:
+        dt = datetime.fromtimestamp(day)
+        dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        day = dt.timestamp()
+        in_clause += str(day) + ","
+        year_months.add((dt.year, dt.month))
+
+    for year, month in year_months:
+        # register what months we are accessing to generate recurrence events
+        RecurrenceEndpoints.register_month_accessed_by_user(authentication, year, month)
+
+    events_by_day = {}
+    for day in days:
+        cursor.execute("SELECT * FROM events WHERE event_id IN"
+                       "(SELECT event_id FROM events_in_day WHERE user_id = %s AND day = %s)",
+                       (authentication.user_id, day))
+        events_by_day[day] = []
+        for row in cursor.fetchall():
+            events_by_day[day].append(CalendarEvent.from_sql_res(row.__dict__))
+    return {"events": events_by_day}
+
+
+@router.get("/api/calendar/events")
+def get_calendar_events(authentication: Authentication, start_day: float, end_day: Optional[float] = None):
+    # authenticates in later call to get_calendar_events(Authentication, list[float])
     if end_day is None:
         end_day = start_day  
     dt = datetime.fromtimestamp(start_day)
-    event_ids = set()
+    days = []
     while dt.timestamp() <= end_day:
-        dt.replace(hour=0, minute=0, second=0, microsecond=0)
-        year = dt.year
-        month = dt.month
-        # register that we are accessing month to generate recurrence events
-        RecurrenceEndpoints.register_month_accessed_by_user(authentication, year, month)
-        cursor.execute("SELECT event_id FROM events_in_day WHERE day = %s AND user_id = %s",
-                                              (dt.timestamp(), authentication.user_id))
-        res = cursor.fetchall()
-        for row in res:
-            event_ids.add(row["event_id"])
+        dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        days.append(dt.timestamp())
         dt += datetime.timedelta(days=1)
 
-    stmt = ""
-    for event_id in event_ids:
-        stmt += f"SELECT * FROM events WHERE event_id = {event_id};"
-    cursor.execute(stmt, multi=True)
-    res = cursor.fetchall()
-    return {"events": res}
+    return get_calendar_events(authentication, days)
 
 
 @router.put("/api/calendar/events/{event_id}")
-def update_calendar_event(authentication: Authentication, event_id: int, event: CalendarEvent):
+def update_calendar_event(authentication: Authentication, event_id: int, updated_event: CalendarEvent):
     res = get_calendar_event(authentication, event_id)
-    time_changed = False
-    if res["start_instant"] != event.startInstant or res["end_instant"] != event.endInstant:
-        time_changed = True
     cursor.execute("UPDATE events SET %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s WHERE event_id = %s",
-                                          (NAME, event.name,
-                                           DESCRIPTION, event.description,
-                                           IS_HIDDEN, event.isHidden,
-                                           START_INSTANT, event.startInstant,
-                                           END_INSTANT, event.endInstant,
-                                           DURATION, event.duration,
-                                           LINKED_GOAL_ID, event.linkedGoalId,
-                                           LINKED_TODO_ID, event.linkedTodoId,
+                                          (NAME, updated_event.name,
+                                           DESCRIPTION, updated_event.description,
+                                           IS_HIDDEN, updated_event.isHidden,
+                                           START_INSTANT, updated_event.startInstant,
+                                           END_INSTANT, updated_event.endInstant,
+                                           DURATION, updated_event.duration,
+                                           LINKED_GOAL_ID, updated_event.linkedGoalId,
+                                           LINKED_TODO_ID, updated_event.linkedTodoId,
                                            event_id))
-    if time_changed:
+    if res["start_instant"] != updated_event.startInstant or res["end_instant"] != updated_event.endInstant:
         cursor.execute("DELETE FROM events_in_day WHERE event_id = %s", (event_id,))
-        query, params = event.get_sql_events_in_day_insert_query_and_params()
+        query, params = updated_event.get_sql_events_in_day_insert_query_and_params()
         cursor.execute(query, params)  # add back to events_in_day
-
-    # yuhhhhhh
 
 
 @router.delete("/api/calendar/events/{event_id}")

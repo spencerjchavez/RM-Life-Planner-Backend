@@ -28,8 +28,11 @@ def create_todo(authentication: Authentication, todo: ToDo):
         todo.get_sql_insert_params())
 
     # insert into todos_by_user_day
-    stmt, params = todo.get_sql_todos_in_day_insert_query_and_params()
-    cursor.execute(stmt, params)
+    if todo.deadline is None:
+        cursor.execute()
+    else:
+        stmt, params = todo.get_sql_todos_in_day_insert_query_and_params()
+        cursor.execute(stmt, params)
     return {"message": "todo successfully added", "todo_id": todo.todoId}
 
 
@@ -45,52 +48,70 @@ def get_todo(authentication: Authentication, todo_id: int):
 
 
 @router.get("/api/calendar/todos")
-def get_todos(authentication: Authentication, start_day: float, end_day: Optional[float] = None):
+def get_todos(authentication: Authentication, days: list[float]):
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
+    year_months = set()
+    for day in days:
+        dt = datetime.fromtimestamp(day)
+        dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        day = dt.timestamp()
+        year_months.add((dt.year, dt.month))
+
+    for year, month in year_months:
+        # register what months we are accessing to generate recurrence events
+        RecurrenceEndpoints.register_month_accessed_by_user(authentication, year, month)
+
+
+    todos_by_day = {}
+    cursor.execute("SELECT * FROM todos WHERE todo_id IN"
+                   "(SELECT todo_id FROM todos_without_deadline WHERE user_id = %s)", (authentication.user_id,))
+    todos_without_deadline = cursor.fetchall()
+    for day in days:
+        cursor.execute("SELECT * FROM events WHERE event_id IN"
+                       "(SELECT event_id FROM events_in_day WHERE user_id = %s AND day = %s)",
+                       (authentication.user_id, day))
+        todos_by_day[day] = []
+        for row in cursor.fetchall():
+            todos_by_day[day].append(ToDo.from_sql_res(row.__dict__))
+        for todo_without_deadline in todos_without_deadline:
+            todos_by_day[day].append(todo_without_deadline.__dict__)
+    return {"todos": todos_by_day}
+    # todo: check if lazy loading is implemented here / if it would be faster if we fetched results outside of these loops
+
+
+@router.get("/api/calendar/todos")
+def get_todos(authentication: Authentication, start_day: float, end_day: Optional[float] = None):
+    # authenticates in later call to get_todos(Authentication, list[float])
     dt = datetime.fromtimestamp(start_day)
-    todo_ids = set()
     if end_day is None:
         end_day = start_day
+    days = []
     while dt.timestamp() <= end_day:
         dt.replace(hour=0, minute=0, second=0, microsecond=0)
-        year = dt.year
-        month = dt.month
-        # register that we are accessing month to generate recurrence todos
-        RecurrenceEndpoints.register_month_accessed_by_user(authentication, year, month)
-        cursor.execute("SELECT todo_id FROM todos_in_day WHERE day = %s AND user_id = %s",
-                                             (dt.timestamp(), authentication.user_id))
-        res = cursor.fetchall()
-        for row in res:
-            todo_ids.add(row["todo_id"])
+        days.append(dt.timestamp())
         dt += datetime.timedelta(days=1)
 
-    stmt = ""
-    for todo_id in todo_ids:
-        stmt += f"SELECT * FROM todos WHERE todo_id = {todo_id};"
-    cursor.execute(stmt, multi=True)
-    res = cursor.fetchall()
-    return {"todos": res}
+    return get_todos(authentication, days)
 
 
 @router.put("/api/calendar/todos/{todo_id}")
-def update_calendar_todo(authentication: Authentication, todo_id: int, todo: ToDo):
+def update_calendar_todo(authentication: Authentication, todo_id: int, updated_todo: ToDo):
     res = get_todo(authentication, todo_id)
     time_changed = False
     if res["start_instant"] != todo.startInstant or res[TIMEFRAME] != todo.timeframe:
         time_changed = True
     cursor.execute(
         "UPDATE todos SET %s = %s, %s = %s, %s = %s, %s = %s WHERE todo_id = %s",
-        (NAME, todo.name,
-         START_INSTANT, todo.startInstant,
-         TIMEFRAME, todo.timeframe,
-         LINKED_GOAL_ID, todo.linkedGoalId,
+        (NAME, updated_todo.name,
+         START_INSTANT, updated_todo.startInstant,
+         END_INSTANT, updated_todo.endInstant,
+         LINKED_GOAL_ID, updated_todo.linkedGoalId,
          todo_id))
     if time_changed:
         cursor.execute("DELETE FROM todos_in_day WHERE todo_id = %s", (todo_id,))
-        query, params = todo.get_sql_todos_in_day_insert_query_and_params()
+        query, params = updated_todo.get_sql_todos_in_day_insert_query_and_params()
         cursor.execute(query, params)  # add back to todos_in_day
-
     # yuhhhhhh
 
 

@@ -1,17 +1,12 @@
 # CREATED JUNE OF 2023 BY SPENCER CHAVEZ
 from typing import Optional
 from pydantic import BaseModel
-from enum import Enum
 from models.SQLColumnNames import *
+from models.CalendarEvent import CalendarEvent
+import datetime
 
 
 class Goal(BaseModel):
-    class Timeframe(Enum):
-        INDEFINITE = 0
-        DAY = 1
-        WEEK = 2
-        MONTH = 3
-        YEAR = 4
 
     goalId: Optional[int]
     desireId: Optional[int]
@@ -20,10 +15,10 @@ class Goal(BaseModel):
     howMuch: Optional[int]
     measuringUnits: Optional[str]
     startInstant: Optional[float]
-    deadline: Optional[float]  # null == goal is indefinite. This parameter is overridden by timeframe in recurring goals
+    endInstant: Optional[float]  # null == goal is indefinite. This parameter is overridden by timeframe in recurring goals
     # recurring goal stuff
     recurrenceId: Optional[int]
-    timeframe: Optional[Timeframe]
+    recurrenceDay: Optional[float]  # the day of the recurrence instance (user may modify the actual startInstance later, but this value won't change)
 
     def get_sql_insert_query(self):
         return "INSERT INTO goals VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
@@ -36,9 +31,18 @@ class Goal(BaseModel):
                 self.howMuch,
                 self.measuringUnits,
                 self.startInstant,
-                self.deadline,
+                self.endInstant,
                 self.recurrenceId,
-                self.timeframe)
+                self.recurrenceDay)
+
+    def get_sql_goals_in_day_insert_query_and_params(self):
+        if self.endInstant is None:
+            raise ValueError()
+        days = CalendarEvent.get_days_in_range(self.startInstant, self.endInstant)
+        values_str = ""
+        for day in days:
+            values_str += (",(%s, %s, %s)" % day, self.goalId, self.userId)
+        return "INSERT INTO events_in_day VALUES (day, event_id, user_id) VALUES %s ;", (values_str[1:])
 
     @staticmethod
     def from_sql_res(src: dict):
@@ -50,7 +54,7 @@ class Goal(BaseModel):
             howMuch=src[HOW_MUCH],
             measuringUnits=src[MEASURING_UNITS],
             startInstant=src[START_INSTANT],
-            deadline=src[DEADLINE],
+            endInstant=src[END_INSTANT],
             recurrenceId=src[RECURRENCE_ID],
-            timeframe=src[TIMEFRAME]
+            recurrenceDay=src[RECURRENCE_DAY]
         )

@@ -1,7 +1,7 @@
 from models.ToDo import ToDo
 from testing.sample_objects.goal_achieving.goals import *
 
-APPLY_10_JOBS_TODO = ToDo(
+APPLY_FOR_10_JOBS_TODO = ToDo(
   name=APPLY_FOR_JOB_GOAL.name,
   startInstant=time.time(),
   deadline=APPLY_FOR_JOB_GOAL.deadline
