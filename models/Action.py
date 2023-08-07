@@ -15,7 +15,7 @@ class Action(BaseModel):
     planId: Optional[int]  # every action should have a plan which it fulfills
     userId: Optional[int]
     successful: Optional[int]
-    howMuchAccomplished: Optional[int]
+    howMuchAccomplished: Optional[float]
     notes: Optional[str]
 
     def get_sql_insert_query(self):

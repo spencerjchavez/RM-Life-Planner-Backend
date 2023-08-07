@@ -12,7 +12,7 @@ class Goal(BaseModel):
     desireId: Optional[int]
     userId: Optional[int]
     name: Optional[str]
-    howMuch: Optional[int]
+    howMuch: Optional[float]
     measuringUnits: Optional[str]
     startInstant: Optional[float]
     endInstant: Optional[float]  # null == goal is indefinite. This parameter is overridden by timeframe in recurring goals
@@ -42,7 +42,7 @@ class Goal(BaseModel):
         values_str = ""
         for day in days:
             values_str += (",(%s, %s, %s)" % day, self.goalId, self.userId)
-        return "INSERT INTO events_in_day VALUES (day, event_id, user_id) VALUES %s ;", (values_str[1:])
+        return "INSERT INTO events_in_day (day, event_id, user_id) VALUES %s ;", (values_str[1:])
 
     @staticmethod
     def from_sql_res(src: dict):

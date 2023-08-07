@@ -28,8 +28,9 @@ def create_todo(authentication: Authentication, todo: ToDo):
         todo.get_sql_insert_params())
 
     # insert into todos_by_user_day
-    if todo.deadline is None:
-        cursor.execute()
+    todo.todoId = cursor.lastrowid
+    if todo.endInstant is None:
+        cursor.execute("INSERT INTO todos_without_deadline (todo_id, user_id) VALUES %s, %s;", (todo.todoId, todo.userId))
     else:
         stmt, params = todo.get_sql_todos_in_day_insert_query_and_params()
         cursor.execute(stmt, params)
@@ -44,8 +45,7 @@ def get_todo(authentication: Authentication, todo_id: int):
     res = cursor.fetchone()
     if res["user_id"] != authentication.user_id:
         raise HTTPException(detail="User is not authenticated to access this resource", status_code=401)
-    return res
-
+    return {"todo": ToDo.from_sql_res(res.__dict__)}
 
 @router.get("/api/calendar/todos")
 def get_todos(authentication: Authentication, days: list[float]):
@@ -62,20 +62,19 @@ def get_todos(authentication: Authentication, days: list[float]):
         # register what months we are accessing to generate recurrence events
         RecurrenceEndpoints.register_month_accessed_by_user(authentication, year, month)
 
-
     todos_by_day = {}
     cursor.execute("SELECT * FROM todos WHERE todo_id IN"
                    "(SELECT todo_id FROM todos_without_deadline WHERE user_id = %s)", (authentication.user_id,))
     todos_without_deadline = cursor.fetchall()
     for day in days:
-        cursor.execute("SELECT * FROM events WHERE event_id IN"
-                       "(SELECT event_id FROM events_in_day WHERE user_id = %s AND day = %s)",
+        cursor.execute("SELECT * FROM todos WHERE todo_id IN"
+                       "(SELECT todo_id FROM todos_in_day WHERE user_id = %s AND day = %s)",
                        (authentication.user_id, day))
         todos_by_day[day] = []
         for row in cursor.fetchall():
             todos_by_day[day].append(ToDo.from_sql_res(row.__dict__))
         for todo_without_deadline in todos_without_deadline:
-            todos_by_day[day].append(todo_without_deadline.__dict__)
+            todos_by_day[day].append(ToDo.from_sql_res(todo_without_deadline.__dict__))
     return {"todos": todos_by_day}
     # todo: check if lazy loading is implemented here / if it would be faster if we fetched results outside of these loops
 
@@ -97,9 +96,9 @@ def get_todos(authentication: Authentication, start_day: float, end_day: Optiona
 
 @router.put("/api/calendar/todos/{todo_id}")
 def update_calendar_todo(authentication: Authentication, todo_id: int, updated_todo: ToDo):
-    res = get_todo(authentication, todo_id)
+    todo = get_todo(authentication, todo_id)["todo"]
     time_changed = False
-    if res["start_instant"] != todo.startInstant or res[TIMEFRAME] != todo.timeframe:
+    if todo.startInstant != updated_todo.startInstant or todo.endInstant != updated_todo.endInstant:
         time_changed = True
     cursor.execute(
         "UPDATE todos SET %s = %s, %s = %s, %s = %s, %s = %s WHERE todo_id = %s",

@@ -104,8 +104,16 @@ def create_goal(authentication: Authentication, goal: Goal):
     stmt = goal.get_sql_insert_query()
     params = goal.get_sql_insert_params()
     cursor.execute(stmt, params)
-    goal_id = cursor.lastrowid
-    return {"message": "Goal created successfully", "goal_id": goal_id}
+    goal.goalId = cursor.lastrowid
+    if goal.endInstant is None:
+        # insert into goals_without_deadline
+        cursor.execute("INSERT INTO goals_without_deadline (goal_id, user_id) VALUES %s, %s;", (goal.goalId, goal.user_id))
+    else:
+        # insert into goals_in_day
+        stmt, params = goal.get_sql_goals_in_day_insert_query_and_params()
+        cursor.execute(stmt, params)
+
+    return {"message": "Goal created successfully", "goal_id": goal.goalId}
 
 
 @router.get("/api/goals/{goal_id}")
@@ -154,6 +162,9 @@ def get_goals(authentication: Authentication, days: list[float]):
         RecurrenceEndpoints.register_month_accessed_by_user(authentication, year, month)
 
     goals_by_day = {}
+    cursor.execute("SELECT * FROM goals WHERE goal_id IN"
+                   "(SELECT goal_id FROM goals_without_deadline WHERE user_id = %s)", (authentication.user_id,))
+    goals_without_deadline = cursor.fetchall()
     for day in days:
         cursor.execute("SELECT * FROM goals WHERE goal_id IN"
                        "(SELECT goal_id FROM goals_in_day WHERE user_id = %s AND day = %s)",
@@ -161,7 +172,9 @@ def get_goals(authentication: Authentication, days: list[float]):
         goals_by_day[day] = []
         for row in cursor.fetchall():
             goals_by_day[day].append(Goal.from_sql_res(row.__dict__))
-    return {"events": goals_by_day}
+        for goal_without_deadline in goals_without_deadline:
+            goals_by_day[day].append(Goal.from_sql_res(goal_without_deadline.__dict__))
+    return {"goals": goals_by_day}
 
 
 @router.put("/api/goals/{goal_id}")
@@ -217,17 +230,27 @@ def create_plan(authentication: Authentication, plan: Plan):
 
 @router.get("/api/plans/{plan_id}")
 def get_plan(authentication: Authentication, plan_id: int):
-    user_id = authentication.user_id
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
     cursor.execute("SELECT * FROM plans WHERE plan_id = %s", (plan_id,))
     res = cursor.fetchone()
     if res is None:
         raise HTTPException(detail="no such plan exists", status_code=404)
-    if user_id != res["user_id"]:
+    if authentication.user_id != res["user_id"]:
         raise HTTPException(detail="User is not authorized to access this object", status_code=401)
     return {"plan": Plan.from_sql_res(res.__dict__)}
 
+
+@router.get("/api/plans/")
+def get_plans_by_goal_id(authentication: Authentication, goal_id: int):
+    if not UserEndpoints.authenticate(authentication):
+        raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
+    cursor.execute("SELECT * FROM plans WHERE goal_id = %s", (goal_id,))
+    res_list = cursor.fetchall()
+    plans = []
+    for res in res_list:
+        plans.append(Plan.from_sql_res(res.__dict__))
+    return {"plans": plans}
 
 @router.put("/api/plans/{plan_id}")
 def update_plan(authentication: Authentication, plan_id: int, updated_plan: Plan):

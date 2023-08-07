@@ -9,7 +9,7 @@ class Plan(BaseModel):
     userId: Optional[int]
     goalId: Optional[int]
     eventId: Optional[int]
-    howMuch: Optional[int]
+    howMuch: Optional[float]
 
     def get_sql_insert_query(self):
         return "INSERT INTO plans VALUES (%s, %s, %s, %s, %s);"

@@ -19,9 +19,6 @@ cursor: MySQLCursor
 months_accessed_cache: {int: {int: {int: bool}}}  # user_id, year, month, if month has been accessed
 
 
-# TODO: VALIDATE INPUT FOR RECURRENCE OBJECTS
-
-
 @router.post("/api/calendar/recurrences")
 def create_recurrence(authentication: Authentication, recurrence: Recurrence):
     if not UserEndpoints.authenticate(authentication):
@@ -34,8 +31,8 @@ def create_recurrence(authentication: Authentication, recurrence: Recurrence):
     q = recurrence.get_sql_insert_query()
     cursor.execute(q)
     recurrence.recurrenceId = cursor.lastrowid
-    generate_recurrence_instances_for_new_recurrence(authentication, recurrence)
-    return recurrence.recurrenceId
+    __generate_recurrence_instances_for_new_recurrence(authentication, recurrence)
+    return {"recurrence_id": recurrence.recurrenceId}
 
 
 @router.get("/api/calendar/recurrences/{recurrence_id}")
@@ -56,27 +53,30 @@ def update_recurrence(authentication: Authentication, recurrence_id: int, update
                       inclusive: bool):
     is_valid, msg = __validate_recurrence(updated_recurrence)
     if not is_valid:
-        raise HTTPException(status_code=400, detail=msg)    # deletes all future events and regenerates them with the new recurrence rule
-    delete_recurrences_after_date(authentication, recurrence_id, after, inclusive)
+        raise HTTPException(status_code=400,
+                            detail=msg)  # deletes all future events and regenerates them with the new recurrence rule
+    delete_recurrence_instances_after_date(authentication, recurrence_id, after, inclusive)
     # insert new recurrence
     updated_recurrence.startInstant = after
-    cursor.execute("UPDATE recurrences SET %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s WHERE recurrence_id = %s",
-                   (START_INSTANT, updated_recurrence.startInstant,
-                    RRULE_STRING, updated_recurrence.rruleString,
-                    RECURRENCE_EVENT_NAME, updated_recurrence.eventName,
-                    RECURRENCE_EVENT_DESCRIPTION, updated_recurrence.eventDescription,
-                    RECURRENCE_EVENT_DURATION, updated_recurrence.eventDuration,
-                    RECURRENCE_TODO_NAME, updated_recurrence.todoName,
-                    RECURRENCE_TODO_TIMEFRAME, updated_recurrence.todoTimeframe,
-                    RECURRENCE_GOAL_NAME, updated_recurrence.goalName,
-                    RECURRENCE_GOAL_DESIRE_ID, updated_recurrence.goalDesireId,
-                    RECURRENCE_GOAL_HOW_MUCH, updated_recurrence.goalHowMuch,
-                    RECURRENCE_GOAL_MEASURING_UNITS, updated_recurrence.goalMeasuringUnits,
-                    RECURRENCE_GOAL_TIMEFRAME, updated_recurrence.goalTimeframe,
-                    recurrence_id))
+    cursor.execute(
+        "UPDATE recurrences SET %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s WHERE recurrence_id = %s",
+        (START_INSTANT, updated_recurrence.startInstant,
+         RRULE_STRING, updated_recurrence.rruleString,
+         RECURRENCE_EVENT_NAME, updated_recurrence.eventName,
+         RECURRENCE_EVENT_DESCRIPTION, updated_recurrence.eventDescription,
+         RECURRENCE_EVENT_DURATION, updated_recurrence.eventDuration,
+         RECURRENCE_TODO_NAME, updated_recurrence.todoName,
+         RECURRENCE_TODO_TIMEFRAME, updated_recurrence.todoTimeframe,
+         RECURRENCE_GOAL_NAME, updated_recurrence.goalName,
+         RECURRENCE_GOAL_DESIRE_ID, updated_recurrence.goalDesireId,
+         RECURRENCE_GOAL_HOW_MUCH, updated_recurrence.goalHowMuch,
+         RECURRENCE_GOAL_MEASURING_UNITS, updated_recurrence.goalMeasuringUnits,
+         RECURRENCE_GOAL_TIMEFRAME, updated_recurrence.goalTimeframe,
+         recurrence_id))
     updated_recurrence.recurrenceId = cursor.lastrowid
-    generate_recurrence_instances_for_new_recurrence(authentication, updated_recurrence)
+    __generate_recurrence_instances_for_new_recurrence(authentication, updated_recurrence)
     return {"message": "recurrence successfully updated!"}
+
 
 @router.put("/api/calendar/recurrences/{recurrence_id}")
 def set_recurrence_end(authentication: Authentication, recurrence_id: int, end: float):
@@ -100,8 +100,8 @@ def delete_recurrence(authentication: Authentication, recurrence_id: int):
 
 
 @router.delete("/api/calendar/recurrences/{recurrence_id}")
-def delete_recurrences_instances_after_date(authentication: Authentication, recurrence_id, after: float,
-                                  inclusive: bool):
+def delete_recurrence_instances_after_date(authentication: Authentication, recurrence_id, after: float,
+                                           inclusive: bool):
     get_recurrence(authentication, recurrence_id)  # authenticate
     cursor.execute("DELETE FROM goals WHERE recurrence_id = %s AND %s %s %s;",
                    (recurrence_id, START_INSTANT, ">=" if inclusive else ">", after))
@@ -123,36 +123,31 @@ def __generate_recurrence_instances_for_month(authentication: Authentication, ye
     res = cursor.fetchall()
     for row in res:
         recurrence = Recurrence.from_sql_res(row.__dict__)
-        rrule_str = row[RRULE_STRING]
-        rule = rrulestr(rrule_str)
+        rule = rrule.rrulestr(recurrence.rruleString)
         start_dt = datetime(year=year, month=month, day=1, hour=0, minute=0, second=0, microsecond=0)
         end_dt = start_dt + relativedelta.relativedelta(months=1) - timedelta(minutes=1)
-        occurrences = rule.between(after=start_dt, before=end_dt, inc=True)
-        events_to_add: [CalendarEvent] = []
-        todos_to_add: [ToDo] = []
-        goals_to_add: [Goal] = []
-        for occurrence in occurrences:
-            # is occurrence a datetime?? hopefully...
-            event, todo, goal = recurrence.generate_instance_objects(occurrence)
-            events_to_add.append(event)
-            todos_to_add.append(todo)
-            goals_to_add.append(goal)
+        if end_dt.timestamp() >= recurrence.startInstant:  # if within recurrence timeframe, generate instances, else pass
+            occurrences = rule.between(after=start_dt, before=end_dt, inc=True)
+            for occurrence in occurrences:
+                if occurrence.timestamp() >= recurrence.startInstant:
+                    event, todo, goal = recurrence.generate_instance_objects(occurrence)
+                    if goal is not None:
+                        goal_id = GoalAchievingEndpoints.create_goal(authentication, goal)
+                        todo.linkedGoalId = goal_id
+                        if event is not None:
+                            event.linkedGoalId = goal_id
+                    if todo is not None:
+                        todo_id = CalendarToDoEndpoints.create_todo(authentication, todo)
+                        event.linkedTodoId = todo_id
+                    if event is not None:
+                        CalendarEventEndpoints.create_calendar_event(authentication, event)
 
-        # add all goals
-        # get ids of goals
-        # link them with todos / events
-        # add all todos
-        # get ids of todos
-        # link them with events
-        # add all events
-
-        # add mass insert id to group bulk inserts and easily fetch those ids?????
-
+        # idea to make this faster:
+        # add mass insert id to group bulk insert events, todos, and goals
+        # then use mass insert id to easily fetch those ids and add it to the linkedGoalIds + linkedToDoIds
 
 
-
-
-def generate_recurrence_instances_for_new_recurrence(authentication: Authentication, recurrence: Recurrence):
+def __generate_recurrence_instances_for_new_recurrence(authentication: Authentication, recurrence: Recurrence):
     year_month_tuples = get_months_accessed_by_user(authentication.user_id)
     for year, month in year_month_tuples:
         rule = rrule.rrulestr(recurrence.rruleString)
@@ -164,6 +159,15 @@ def generate_recurrence_instances_for_new_recurrence(authentication: Authenticat
                 if occurrence.timestamp() >= recurrence.startInstant:
                     event, todo, goal = recurrence.generate_instance_objects(occurrence)
                     if goal is not None:
+                        goal_id = GoalAchievingEndpoints.create_goal(authentication, goal)
+                        todo.linkedGoalId = goal_id
+                        if event is not None:
+                            event.linkedGoalId = goal_id
+                    if todo is not None:
+                        todo_id = CalendarToDoEndpoints.create_todo(authentication, todo)
+                        event.linkedTodoId = todo_id
+                    if event is not None:
+                        CalendarEventEndpoints.create_calendar_event(authentication, event)
 
 
 def get_deadline(timeframe: Recurrence.Timeframe, start_instant: float):
@@ -212,6 +216,7 @@ def register_month_accessed_by_user(authentication: Authentication, year: int, m
             __generate_recurrence_instances_for_month(authentication, year, month)
         months_accessed_cache.setdefault(authentication.user_id, {}).setdefault(year, {})[
             month] = True
+
 
 def __validate_recurrence(recurrence: Recurrence):
     if recurrence.goalName is not None:
