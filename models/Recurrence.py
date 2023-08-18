@@ -1,23 +1,23 @@
 from enum import Enum
-from typing import Optional, Any
+from typing import Optional
 from pydantic import BaseModel
 
 from models.Goal import Goal
 from models.ToDo import ToDo
 from models.CalendarEvent import CalendarEvent
 from models.SQLColumnNames import *
-from datetime import datetime, timedelta
+from datetime import datetime
 from dateutil import relativedelta
 
 
 class Recurrence(BaseModel):
 
     class Timeframe(Enum):
-        INDEFINITE = 0
-        DAY = 1
-        WEEK = 2
-        MONTH = 3
-        YEAR = 4
+        INDEFINITE = 'INDEFINITE'
+        DAY = 'DAY'
+        WEEK = 'WEEK'
+        MONTH = 'MONTH'
+        YEAR = 'YEAR'
 
     recurrenceId: Optional[int] = None
     userId: Optional[int] = None
@@ -60,7 +60,6 @@ class Recurrence(BaseModel):
                 self.goalTimeframe)
 
     def generate_instance_objects(self, dt: datetime):
-        # REDO THIS
         start_dt = datetime.fromtimestamp(self.startInstant)
         hours = start_dt.hour
         minutes = start_dt.minute
@@ -110,7 +109,6 @@ class Recurrence(BaseModel):
             event.description = self.eventDescription
             event.startInstant = dt.timestamp() + event_start_offset
             event.endInstant = event.startInstant + self.eventDuration
-            event.duration = self.eventDuration
             event.userId = self.userId
             event.recurrenceId = self.recurrenceId
             event.recurrenceDay = day_start.timestamp()

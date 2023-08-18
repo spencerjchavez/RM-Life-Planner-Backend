@@ -116,6 +116,7 @@ def get_user_with_login_info(user_id: int):
     return cursor.fetchone()
 
 
+
 @router.put("/api/users/{user_id}")
 def update_user(authentication: Authentication, user_id: int, updated_user: User):
     if not authenticate(authentication):
@@ -124,10 +125,13 @@ def update_user(authentication: Authentication, user_id: int, updated_user: User
     if updated_user.password is not None:
         updated_user.hashedPassword = bcrypt.hashpw(updated_user.password.encode("utf-8"),
                                                     res["salt"])
+    else:
+        updated_user.hashedPassword = res["hashed_password"]
+    __validate_user(updated_user)
     cursor.execute("UPDATE users SET hashed_password = %s, email = %s, google_calendar_id = %s WHERE user_id = %s;",
-                   (updated_user.hashedPassword or res["hashed_password"],
-                    updated_user.email or res["email"],
-                    updated_user.googleCalendarId or res["google_calendar_id"],
+                   (updated_user.hashedPassword,
+                    updated_user.email,
+                    updated_user.googleCalendarId,
                     user_id))
     return "successfully updated"
 
@@ -145,7 +149,7 @@ def delete_user(authentication: Authentication, user_id: int):
     cursor.execute("DELETE FROM alerts WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM goals_in_day WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM goals WHERE user_id = %s", (user_id,))
-    cursor.execute("DELETE FROM recurrences WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM desires WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM months_accessed_by_user WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM users WHERE user_id = %s;", (user_id,))
@@ -182,3 +186,22 @@ def authenticate(authentication: Authentication):
         return False
     print("invalid user_id and api_key combo. Cannot authenticate.")
     return False
+
+
+def __validate_user(user: User):
+    if user.userId is None:
+        raise HTTPException(detail="user must define a user id", status_code=400)
+    if user.username is None:
+        raise HTTPException(detail="user must define a username", status_code=400)
+    if len(user.username) == 0 or len(user.username) > 24:
+        raise HTTPException(detail="user must define a username between 1 and 24 characters long", status_code=400)
+    if user.hashedPassword is None:
+        raise HTTPException(detail="user must define a password", status_code=400)
+    if user.salt is None:
+        raise HTTPException(detail="user must have a salt", status_code=400)
+    if user.dateJoined is None:
+        raise HTTPException(detail="user must define a date joined attribute", status_code=400)
+    if user.email is None:
+        raise HTTPException(detail="user must define a valid email", status_code=400)
+    if len(user.email) <= 4 or len(user.email) > 42:
+        raise HTTPException(detail="user's email must be less than 42 characters long", status_code=400)

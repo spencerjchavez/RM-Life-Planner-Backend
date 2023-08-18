@@ -12,9 +12,9 @@ class Desire(BaseModel):
     deadline: Optional[float]
     dateRetired: Optional[float]
     priorityLevel: Optional[int]
-    colorR: Optional[int]
-    colorG: Optional[int]
-    colorB: Optional[int]
+    colorR: Optional[float]
+    colorG: Optional[float]
+    colorB: Optional[float]
 
     def get_sql_insert_query(self):
         return "INSERT INTO desires VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"

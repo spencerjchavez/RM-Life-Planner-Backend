@@ -23,11 +23,7 @@ months_accessed_cache: {int: {int: {int: bool}}}  # user_id, year, month, if mon
 def create_recurrence(authentication: Authentication, recurrence: Recurrence):
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
-    if recurrence.userId != authentication.user_id:
-        raise HTTPException(status_code=401, detail="User is not authenticated to create this resource")
-    is_valid, msg = __validate_recurrence(recurrence)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=msg)
+    __validate_recurrence(authentication, recurrence)
     q = recurrence.get_sql_insert_query()
     cursor.execute(q)
     recurrence.recurrenceId = cursor.lastrowid
@@ -51,10 +47,9 @@ def get_recurrence(authentication: Authentication, recurrence_id: int):
 def update_recurrence(authentication: Authentication, recurrence_id: int, updated_recurrence: Recurrence,
                       after: float,
                       inclusive: bool):
-    is_valid, msg = __validate_recurrence(updated_recurrence)
-    if not is_valid:
-        raise HTTPException(status_code=400,
-                            detail=msg)  # deletes all future events and regenerates them with the new recurrence rule
+    # authenticate
+    _ = get_recurrence(authentication, recurrence_id)
+    __validate_recurrence(authentication, updated_recurrence)
     delete_recurrence_instances_after_date(authentication, recurrence_id, after, inclusive)
     # insert new recurrence
     updated_recurrence.startInstant = after
@@ -90,7 +85,7 @@ def set_recurrence_end(authentication: Authentication, recurrence_id: int, end: 
     rule = rule.replace(until=datetime.fromtimestamp(end))
     cursor.execute("UPDATE recurrences SET %s = %s WHERE recurrence_id = %s",
                    (RRULE_STRING, str(rule), recurrence_id))
-
+    delete_recurrence_instances_after_date(authentication, recurrence_id, end, False)
 
 @router.delete("/api/calendar/recurrences/{recurrence_id}")
 def delete_recurrence(authentication: Authentication, recurrence_id: int):
@@ -104,11 +99,11 @@ def delete_recurrence_instances_after_date(authentication: Authentication, recur
                                            inclusive: bool):
     get_recurrence(authentication, recurrence_id)  # authenticate
     cursor.execute("DELETE FROM goals WHERE recurrence_id = %s AND %s %s %s;",
-                   (recurrence_id, START_INSTANT, ">=" if inclusive else ">", after))
+                   (recurrence_id, RECURRENCE_DAY, ">=" if inclusive else ">", after))
     cursor.execute("DELETE FROM todos WHERE recurrence_id = %s AND %s %s %s;",
-                   (recurrence_id, START_INSTANT, ">=" if inclusive else ">", after))
+                   (recurrence_id, RECURRENCE_DAY, ">=" if inclusive else ">", after))
     cursor.execute("DELETE FROM events WHERE recurrence_id = %s AND %s %s %s",
-                   (recurrence_id, START_INSTANT, ">=" if inclusive else ">", after))
+                   (recurrence_id, RECURRENCE_DAY, ">=" if inclusive else ">", after))
     set_recurrence_end(authentication, recurrence_id, after)
 
 
@@ -170,7 +165,7 @@ def __generate_recurrence_instances_for_new_recurrence(authentication: Authentic
                         CalendarEventEndpoints.create_calendar_event(authentication, event)
 
 
-def get_deadline(timeframe: Recurrence.Timeframe, start_instant: float):
+def get_end_instant_with_timeframe(timeframe: Recurrence.Timeframe, start_instant: float):
     # INDEFINITE timeframe todos do not appear in todos_in_day, as they are not bounded to any timeframe, but will simply disappear when they are completed
     if timeframe == Recurrence.Timeframe.INDEFINITE:
         return
@@ -218,18 +213,50 @@ def register_month_accessed_by_user(authentication: Authentication, year: int, m
             month] = True
 
 
-def __validate_recurrence(recurrence: Recurrence):
+def __validate_recurrence(authentication: Authentication, recurrence: Recurrence):
+    if recurrence.userId is None:
+        raise HTTPException(detail="recurrence must define a user id", status_code=400)
+    if recurrence.userId != authentication.user_id:
+        raise HTTPException(detail="recurrence user id must match authentication user id", status_code=400)
+    if recurrence.rruleString is None:
+        raise HTTPException(detail="recurrence must define a valid rrule string", status_code=400)
+    try:
+        rrule.rrulestr(recurrence.rruleString)  # todo: check if this actually throws errors in case of invalid rrule strings
+    except Exception:
+        raise HTTPException(detail="recurrence rrule string is not valid", status_code=400)
+    if recurrence.startInstant is None:
+        raise HTTPException(detail="recurrence must define a valid starting instant", status_code=400)
+
     if recurrence.goalName is not None:
         if recurrence.todoName is None:
-            return False, "Todo must be created if a goal is defined"
+            raise HTTPException(detail="Todo must be created if a goal is defined", status_code=400)
         if recurrence.todoTimeframe != recurrence.goalTimeframe:
-            return False, "Todo and goal timeframes must be equivalent"
+            raise HTTPException(detail="Todo and goal timeframes must be equivalent", status_code=400)
+
+        if len(recurrence.goalName) == 0 or len(recurrence.goalName) > 42:
+            raise HTTPException(detail="goal name must be between 1 and 42 characters", status_code=400)
+        if recurrence.goalDesireId is None:
+            raise HTTPException(detail="goal must define a desire to be linked with", status_code=400)
+        # authenticate desire id
+        GoalAchievingEndpoints.get_desire(authentication, recurrence.goalDesireId)
         if recurrence.goalHowMuch is None:
-            return False, "Goal must define a quantity to achieve"
+            raise HTTPException(detail="goal must define a quantity to achieve", status_code=400)
+        if recurrence.goalHowMuch <= 0:
+            raise HTTPException(detail="goal must define a quantity greater than 0 to achieve", status_code=400)
+        if recurrence.goalMeasuringUnits is not None:
+            if len(recurrence.goalMeasuringUnits) > 12 or len(recurrence.goalMeasuringUnits) == 0:
+                raise HTTPException(detail="goal measuring units must be between 1 and 12 characters in length", status_code=400)
     if recurrence.eventName is not None:
-        if recurrence.eventDuration is None or recurrence.eventDescription is None:
-            return False, "event must define a valid description and duration"
-    else:
-        if recurrence.eventName is None:
-            return False, "recurrence must define a goal, todo, and/or event to repeat"
-    return True, ""
+        if len(recurrence.eventName) == 0 or len(recurrence.eventName) > 32:
+            raise HTTPException(detail="goal name must be between 1 and 32 characters long", status_code=400)
+        if recurrence.eventDuration is None:
+            raise HTTPException(detail="event must define a valid duration", status_code=400)
+        if recurrence.eventDuration <= 0:
+            raise HTTPException(detail="event must define a valid duration greater than 0", status_code=400)
+        if recurrence.eventDescription is None:
+            raise HTTPException(detail="event must define a valid description", status_code=400)
+        if len(recurrence.eventDescription) == 0 or len(recurrence.eventDescription) > 500:
+            raise HTTPException(detail="event description must be between 1 and 500 characters in length", status_code=400)
+
+    if recurrence.eventName is None and recurrence.goalName is None and recurrence.todoName is None:
+        raise HTTPException(detail="recurrence must define a goal, todo, and/or event to repeat", status_code=400)

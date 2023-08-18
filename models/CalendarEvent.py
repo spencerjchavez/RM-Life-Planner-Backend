@@ -1,5 +1,5 @@
 # CREATED JUNE OF 2023 BY SPENCER CHAVEZ
-
+from fastapi import HTTPException
 from pydantic import BaseModel
 from typing import Optional
 import datetime
@@ -15,7 +15,6 @@ class CalendarEvent(BaseModel):
 
     startInstant: Optional[float]
     endInstant: Optional[float]
-    duration: Optional[float]  # client does not pass this
 
     linkedGoalId: Optional[int]
     linkedTodoId: Optional[int]
@@ -23,7 +22,7 @@ class CalendarEvent(BaseModel):
     recurrenceDay: Optional[float]  # the day of the recurrence instance (user may modify the actual startInstance later, but this value won't change)
 
     def get_sql_events_insert_query(self):
-        return "INSERT INTO events VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
+        return "INSERT INTO events VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
 
     def get_sql_insert_params(self):
         return (None,
@@ -33,7 +32,6 @@ class CalendarEvent(BaseModel):
                 self.isHidden,
                 self.startInstant,
                 self.endInstant,
-                self.duration,
 
                 self.linkedGoalId,
                 self.linkedTodoId,
@@ -49,6 +47,8 @@ class CalendarEvent(BaseModel):
 
     @staticmethod
     def get_days_in_range(start: float, end: float):  # is inclusive
+        if end < start:
+            raise Exception()
         dt = datetime.datetime.fromtimestamp(start).replace(hour=0, minute=0, second=0, microsecond=0)
         end_dt = datetime.datetime.fromtimestamp(end)
         days = []
@@ -67,7 +67,6 @@ class CalendarEvent(BaseModel):
             isHidden=src[IS_HIDDEN],
             startInstant=src[START_INSTANT],
             endInstant=src[END_INSTANT],
-            duration=src[DURATION],
 
             linkedGoalId=src[LINKED_GOAL_ID],
             linkedTodoId=src[LINKED_TODO_ID],

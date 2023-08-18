@@ -1,9 +1,8 @@
 # CREATED JUNE OF 2023 BY SPENCER CHAVEZ
 
-import json
-import requests
 from UserEndpointsTest import UserEndpointsTest
 from testing.test_scripts.goal_achieving_tests.GoalAchievingTest import GoalAchievingEndpointsTest
+from testing.test_scripts.calendar_item_tests.CalendarEndpointsTest import CalendarEndpointsTest
 
 sample_users: dict
 base_url = "http://localhost:8000/api"
@@ -35,6 +34,6 @@ if __name__ == '__main__':
     if test_goal_achieving_endpoints:
         GoalAchievingEndpointsTest(base_url).launch_test()
     if test_calendar_endpoints:
-        pass
+        CalendarEndpointsTest(base_url).launch_test()
 
     print("PASSED ALL TESTS!!!")

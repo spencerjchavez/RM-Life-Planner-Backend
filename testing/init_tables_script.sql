@@ -23,7 +23,7 @@ create table users (
     hashed_password tinyblob not null,
     salt tinyblob not null,
     date_joined bigint not null,
-    email varchar(32),
+    email varchar(42),
     google_calendar_id varchar(84)
 );
 CREATE UNIQUE INDEX username_index ON users(username);
@@ -46,9 +46,9 @@ create table desires(
     deadline bigint,
     date_retired bigint,
     priority_level int,
-    color_r tinyint unsigned not null,
-    color_g tinyint unsigned not null,
-    color_b tinyint unsigned not null,
+    color_r float unsigned not null,
+    color_g float unsigned not null,
+    color_b float unsigned not null,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 CREATE INDEX user_id_index ON desires(user_id);
@@ -84,10 +84,10 @@ create table goals(
     desire_id bigint unsigned not null,
     user_id int unsigned not null,
     name varchar(42) not null,
-    how_much float,
+    how_much float not null,
     measuring_units varchar(12),
     start_instant bigint not null,
-    deadline bigint, -- null == goal is indefinite.
+    end_instant bigint, -- null == goal is indefinite.
     -- recurring goal stuff
     recurrence_id bigint unsigned,
     recurrence_day bigint,
@@ -166,7 +166,6 @@ create table events(
     is_hidden bool not null,
     start_instant bigint not null,
     end_instant bigint not null,
-    duration int not null,
 
     linked_goal_id bigint unsigned,
     linked_todo_id bigint unsigned,
@@ -204,10 +203,11 @@ create table alerts(
 create table plans(
     plan_id bigint unsigned primary key not null auto_increment,
     user_id int unsigned not null,
-    goal_id bigint unsigned,
+    goal_id bigint unsigned not null,
     event_id bigint unsigned not null,
-    how_much float,
-    -- plan_description varchar(500), # same as the event description
+    how_much float not null,
+    how_much_accomplished float,
+    notes varchar[300],
 
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (goal_id) REFERENCES goals(goal_id) ON DELETE CASCADE,

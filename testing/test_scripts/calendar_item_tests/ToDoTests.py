@@ -1,3 +1,4 @@
+from dateutil import relativedelta
 from models.ToDo import ToDo
 from models.Authentication import Authentication
 import requests
@@ -24,87 +25,148 @@ class ToDoTests:
         user2_auth = self.user_tests.test_register_user(USER2)
         user3_auth = self.user_tests.test_register_user(USER3)
 
-        DO_HOMEWORK_TODO.userId = user1_auth.user_id
-        DO_HOMEWORK_TODO.todoId = self.test_create_todo(DO_HOMEWORK_TODO, user1_auth)
-        res = self.test_get_todo(DO_HOMEWORK_TODO.todoId, user1_auth)
-        assert (DO_HOMEWORK_TODO == res)
+        self.test_happy_path(user1_auth)
+        self.test_malformed_inputs(user1_auth, user2_auth)
 
-        GO_TO_STORE_TODO.userId = user1_auth.user_id
-        GO_TO_STORE_TODO.todoId = self.test_create_todo(GO_TO_STORE_TODO, user1_auth)
-        res = self.test_get_todo(GO_TO_STORE_TODO.todoId, user1_auth)
-        assert (GO_TO_STORE_TODO == res)
+    def test_malformed_inputs(self, authentication: Authentication, another_authentication: Authentication):
+        self.test_create_malformed_todos(authentication)
+        self.test_get_with_malformed_params(authentication)
+        self.test_update_with_malformed_todos(authentication)
+        self.test_call_functions_without_authentication(authentication, another_authentication)
 
-        READ_SCRIPTURES_TODO.userId = user1_auth.user_id
-        READ_SCRIPTURES_TODO.todoId = self.test_create_todo(READ_SCRIPTURES_TODO, user1_auth)
-        res = self.test_get_todo(READ_SCRIPTURES_TODO.todoId, user1_auth)
-        assert (READ_SCRIPTURES_TODO == res)
+    def test_create_malformed_todos(self, authentication: Authentication):
+        bad_todo = ToDo()
+        self.test_create_todo(bad_todo, authentication, 400)
+        bad_todo.userId = authentication.user_id
+        self.test_create_todo(bad_todo, authentication, 400)
+        bad_todo.name = "todo"
+        bad_todo.endInstant = 10000
+        self.test_create_todo(bad_todo, authentication, 400)
+        bad_todo.startInstant = 9000
+        bad_todo.linkedGoalId = -1
+        self.test_create_todo(bad_todo, authentication, 400)
+        bad_todo.linkedGoalId = None
+        bad_todo.startInstant = 11000  # start instant after endInstant
+        self.test_create_todo(bad_todo, authentication, 400)
 
-        APPLY_FOR_10_JOBS_TODO.userId = user1_auth.user_id
-        APPLY_FOR_10_JOBS_TODO.todoId = self.test_create_todo(APPLY_FOR_10_JOBS_TODO, user1_auth)
-        res = self.test_get_todo(APPLY_FOR_10_JOBS_TODO.todoId, user1_auth)
-        assert (APPLY_FOR_10_JOBS_TODO == res)
+    def test_get_with_malformed_params(self, authentication: Authentication):
+        # setup
+        good_todo = GO_TO_STORE_TODO
+        good_todo.userId = authentication.user_id
+        todo_id = self.test_create_todo(good_todo, authentication)
+        # test
+        self.test_get_todos(good_todo.endInstant, good_todo.startInstant - (60*60*24*5), authentication, 400)
+        # cleanup
+        self.test_delete_todo(todo_id, authentication)
 
-        NEW_NAME = "new todo name"
-        NEW_DESCRIPTION = "ahhhhhhhhhh!!!!!!!!!!!!!!!\nGRRRRRRRRRRRRRR\n happy happy happy happy joy joy joy what da heck"
-        DO_HOMEWORK_TODO.name = NEW_NAME
-        DO_HOMEWORK_TODO.description = NEW_DESCRIPTION
-        DO_HOMEWORK_TODO.endInstant = datetime.datetime.now() + datetime.timedelta(hours=5)
-        self.test_update_todo(DO_HOMEWORK_TODO.todoId, DO_HOMEWORK_TODO, user1_auth)
-        res = self.test_get_todo(DO_HOMEWORK_TODO.todoId, user1_auth)
-        assert (DO_HOMEWORK_TODO == res)
+    def test_update_with_malformed_todos(self, authentication: Authentication):
+        # setup
+        good_todo = GO_TO_STORE_TODO
+        good_todo.userId = authentication.user_id
+        good_todo_id = self.test_create_todo(good_todo, authentication)
+        # test
+        bad_todo = good_todo
+        bad_todo.userId = -1
+        self.test_update_todo(good_todo_id, bad_todo, authentication, 400)
+        bad_todo.userId = authentication.user_id
+        bad_todo.startInstant = 100000
+        bad_todo.endInstant = 1000
+        self.test_update_todo(good_todo_id, bad_todo, authentication, 400)
+        bad_todo.startInstant = 5
+        #cleanup
+        self.test_delete_todo(good_todo_id, authentication)
 
-        NEW_NAME = "new todo name"
-        NEW_DESCRIPTION = "ahhhhhhhhhh!!!!!!!!!!!!!!!\nGRRRRRRRRRRRRRR\n happy happy happy happy joy joy joy what da heck"
-        DO_HOMEWORK_TODO.name = NEW_NAME
-        DO_HOMEWORK_TODO.description = NEW_DESCRIPTION
-        DO_HOMEWORK_TODO.endInstant = datetime.datetime.now() + datetime.timedelta(hours=5)
-        self.test_update_todo(DO_HOMEWORK_TODO.todoId, DO_HOMEWORK_TODO, user1_auth)
-        res = self.test_get_todo(DO_HOMEWORK_TODO.todoId, user1_auth)
-        assert (DO_HOMEWORK_TODO == res)
+    def test_call_functions_without_authentication(self, real_authentication: Authentication, another_real_authentication: Authentication):
+        # setup
+        real_todo = GO_TO_STORE_TODO
+        real_todo.userId = real_authentication.user_id
+        real_todo_id = self.test_create_todo(real_todo, real_authentication)
+        updated_real_todo = real_todo
+        updated_real_todo.endInstant += 5000
+        # test
+        self.test_create_todo(real_todo, another_real_authentication, 401)
+        self.test_update_todo(real_todo_id, updated_real_todo, another_real_authentication, 401)
+        self.test_delete_todo(real_todo_id, another_real_authentication, 401)
 
-        NEW_NAME = "new todo name"
-        NEW_DESCRIPTION = "ahhhhhhhhhh!!!!!!!!!!!!!!!\nGRRRRRRRRRRRRRR\n happy happy happy happy joy joy joy what da heck"
-        GO_TO_STORE_TODO.name = NEW_NAME
-        GO_TO_STORE_TODO.description = NEW_DESCRIPTION
-        GO_TO_STORE_TODO.endInstant = datetime.datetime.now() + datetime.timedelta(hours=5)
-        self.test_update_todo(GO_TO_STORE_TODO.todoId, GO_TO_STORE_TODO, user1_auth)
-        res = self.test_get_todo(GO_TO_STORE_TODO.todoId, user1_auth)
-        assert (GO_TO_STORE_TODO == res)
+    def test_happy_path(self, authentication: Authentication):
+        # create, get, update and delete happy path todos
+        start_time_1 = datetime.datetime(year=1999, month=7, day=4)
+        start_time_2 = (start_time_1 + relativedelta.relativedelta(years=1, months=1, days=2, hours=10, minutes=5))
 
-        NEW_NAME = "new todo name"
-        NEW_DESCRIPTION = "ahhhhhhhhhh!!!!!!!!!!!!!!!\nGRRRRRRRRRRRRRR\n happy happy happy happy joy joy joy what da heck"
-        READ_SCRIPTURES_TODO.name = NEW_NAME
-        READ_SCRIPTURES_TODO.description = NEW_DESCRIPTION
-        READ_SCRIPTURES_TODO.endInstant = datetime.datetime.now() + datetime.timedelta(hours=5)
-        self.test_update_todo(READ_SCRIPTURES_TODO.todoId, READ_SCRIPTURES_TODO, user1_auth)
-        res = self.test_get_todo(READ_SCRIPTURES_TODO.todoId, user1_auth)
-        assert (READ_SCRIPTURES_TODO == res)
+        # get todos by day, should return nothing
+        events = self.test_get_todos(start_time_1.timestamp(), authentication)
+        assert (len(events) == 0)
 
-        self.test_delete_todo(READ_SCRIPTURES_TODO.todoId, user1_auth)
-        self.test_get_todo(READ_SCRIPTURES_TODO.todoId, user1_auth, 404)
-        READ_SCRIPTURES_TODO.todoId = self.test_create_todo(READ_SCRIPTURES_TODO, user1_auth)
-        self.test_create_todo(READ_SCRIPTURES_TODO, user2_auth, 401)
+        # create todos
+        one_day_todos = []
+        for i in range(0, 50):
+            todo = ToDo(
+                name="todo" + str(i),
+                userId=authentication.user_id,
+                startInstant=start_time_1.timestamp(),
+                endInstant=(start_time_1 + datetime.timedelta(days=1)).timestamp(),
+            )
+            todo.todoId = self.test_create_todo(todo, authentication)
+            one_day_todos.append(todo)
 
-        todos_list: list = self.test_get_todos(time.time(), user1_auth)
-        assert (len(todos_list) == 5)
-        assert (todos_list.index(GO_TO_STORE_TODO.dict()))
-        assert (todos_list.index(READ_SCRIPTURES_TODO.dict()))
-        assert (todos_list.index(APPLY_FOR_10_JOBS_TODO.dict()))
-        assert (todos_list.index(
-            GO_TO_STORE_TODO.dict()))  # check that READ_SCRIPTURES_TODO exists within the list
+        for todo in one_day_todos:
+            todo_received = self.test_get_todo(todo.todoId, authentication)
+            assert (todo.dict() == todo_received.dict())
 
-        todos_tomorrow_list = self.test_get_todos((datetime.datetime.now() + datetime.timedelta(days=1)).timestamp())
-        assert (len(todos_tomorrow_list) == 1)
-        assert (APPLY_FOR_10_JOBS_TODO.dict() == todos_tomorrow_list[0])
+        todos_received = self.test_get_todos(start_time_1.timestamp(), authentication)[start_time_1.timestamp()]
+        for todo in one_day_todos:
+            assert (todos_received.index(todo) >= 0)
 
-        APPLY_FOR_10_JOBS_TODO.userId = user2_auth.user_id
-        APPLY_FOR_10_JOBS_TODO.todoId = self.test_create_todo(APPLY_FOR_10_JOBS_TODO, user2_auth)
+        # update todos startInstants
+        for todo in one_day_todos:
+            new_todo = todo
+            new_todo.startInstant = start_time_2.timestamp()
+            new_todo.endInstant = (start_time_2 + datetime.timedelta(days=1)).timestamp()
+            self.test_update_todo(todo.todoId, new_todo, authentication)
 
-        APPLY_FOR_10_JOBS_TODO.userId = user3_auth.user_id
-        APPLY_FOR_10_JOBS_TODO.todoId = self.test_create_todo(APPLY_FOR_10_JOBS_TODO, user3_auth)
+        assert (len(
+            self.test_get_todos(start_time_2.timestamp(), authentication)[start_time_2.timestamp()]) == len(
+            one_day_todos))
+
+        # delete todos
+        for todo in one_day_todos:
+            self.test_delete_todo(todo.todoId, authentication)
+
+        # assert that delete functioned correctly
+        for todo in one_day_todos:
+            self.test_get_todo(todo.todoId, authentication, 404)
+
+        # create happy path week long todos
+        week_long_todos = []
+        start_time = start_time_1
+        for i in range(0, 50):
+            todo = ToDo(
+                name="todo" + str(i),
+                startInstant=start_time.timestamp(),
+                endInstant=(start_time + datetime.timedelta(weeks=1)).timestamp(),
+                userId=authentication.user_id
+            )
+            todo.todoId = self.test_create_todo(todo, authentication)
+            start_time += datetime.timedelta(days=1)
+            week_long_todos.append(todo)
+
+        # test get todos by day
+        day = start_time_1 + datetime.timedelta(days=7)
+        todos = self.test_get_todos(day.timestamp(), authentication)[day.timestamp()]
+        assert (len(todos) == 7)
+
+        todos = self.test_get_todos(start_time_1.timestamp(),
+                                      (start_time_1 + datetime.timedelta(days=60)).timestamp(), authentication)
+        assert (len(events) == 50)
+        assert (len(events[start_time_1.timestamp()]) == 1)
+        assert (len(events[(start_time_1 + datetime.timedelta(days=1)).timestamp()]) == 2)
+
+        # cleanup
+        for todo in week_long_todos:
+            self.test_delete_todo(todo.todoId, authentication)
 
     def test_create_todo(self, todo: ToDo, authentication: Authentication,
-                          expected_response_code: int = 200):
+                         expected_response_code: int = 200):
         todo.userId = authentication.user_id
         res = requests.post(self.todo_url, json=create_authenticated_request_body("todo", todo, authentication))
         compare_responses(res, expected_response_code)
@@ -122,14 +184,15 @@ class ToDoTests:
         compare_responses(res, expected_response_code)
         return res.json()["todos"]
 
-    def test_get_todos(self, start_day: float, end_day: float, authentication: Authentication, expected_response_code: int = 200):
+    def test_get_todos(self, start_day: float, end_day: float, authentication: Authentication,
+                       expected_response_code: int = 200):
         res = requests.get(self.todo_url, params={"start_day": start_day, "end_day": end_day},
                            json=authentication.json())
         compare_responses(res, expected_response_code)
         return res.json()["todos"]
 
     def test_update_todo(self, todo_id: int, updated_todo: ToDo, authentication: Authentication,
-                          expected_response_code: int = 200):
+                         expected_response_code: int = 200):
         updated_todo.userId = authentication.user_id
         res = requests.put(self.todo_url + "/" + str(todo_id),
                            json=create_authenticated_request_body("updated_todo", updated_todo, authentication))

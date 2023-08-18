@@ -8,7 +8,7 @@ from mysql.connector.cursor import MySQLCursor, Error
 from models.ToDo import ToDo
 from models.Authentication import Authentication
 from models.SQLColumnNames import *
-from endpoints import UserEndpoints, RecurrenceEndpoints
+from endpoints import UserEndpoints, RecurrenceEndpoints, GoalAchievingEndpoints
 
 # TODO: make sure IN ALL ENDPOINTS when a user creates a resource the user_id matches
 
@@ -22,7 +22,7 @@ def create_todo(authentication: Authentication, todo: ToDo):
     user_id = authentication.user_id
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
-
+    __validate_todo(authentication, todo)
     cursor.execute(
         todo.get_sql_insert_query(),
         todo.get_sql_insert_params())
@@ -51,6 +51,8 @@ def get_todo(authentication: Authentication, todo_id: int):
 def get_todos(authentication: Authentication, days: list[float]):
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
+    if len(days) == 0:
+        raise HTTPException(detail="Must provide get_todos() with list of days to retrieve", status_code=400)
     year_months = set()
     for day in days:
         dt = datetime.fromtimestamp(day)
@@ -59,7 +61,7 @@ def get_todos(authentication: Authentication, days: list[float]):
         year_months.add((dt.year, dt.month))
 
     for year, month in year_months:
-        # register what months we are accessing to generate recurrence events
+        # register what months we are accessing to generate recurrence todos
         RecurrenceEndpoints.register_month_accessed_by_user(authentication, year, month)
 
     todos_by_day = {}
@@ -85,6 +87,9 @@ def get_todos(authentication: Authentication, start_day: float, end_day: Optiona
     dt = datetime.fromtimestamp(start_day)
     if end_day is None:
         end_day = start_day
+    elif end_day < start_day:
+        raise HTTPException(detail="start_day paramater must be less or equal to end_day parameter",
+                            status_code=400)
     days = []
     while dt.timestamp() <= end_day:
         dt.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -97,9 +102,7 @@ def get_todos(authentication: Authentication, start_day: float, end_day: Optiona
 @router.put("/api/calendar/todos/{todo_id}")
 def update_calendar_todo(authentication: Authentication, todo_id: int, updated_todo: ToDo):
     todo = get_todo(authentication, todo_id)["todo"]
-    time_changed = False
-    if todo.startInstant != updated_todo.startInstant or todo.endInstant != updated_todo.endInstant:
-        time_changed = True
+    __validate_todo(authentication, todo)
     cursor.execute(
         "UPDATE todos SET %s = %s, %s = %s, %s = %s, %s = %s WHERE todo_id = %s",
         (NAME, updated_todo.name,
@@ -107,11 +110,10 @@ def update_calendar_todo(authentication: Authentication, todo_id: int, updated_t
          END_INSTANT, updated_todo.endInstant,
          LINKED_GOAL_ID, updated_todo.linkedGoalId,
          todo_id))
-    if time_changed:
+    if todo.startInstant != updated_todo.startInstant or todo.endInstant != updated_todo.endInstant:
         cursor.execute("DELETE FROM todos_in_day WHERE todo_id = %s", (todo_id,))
         query, params = updated_todo.get_sql_todos_in_day_insert_query_and_params()
         cursor.execute(query, params)  # add back to todos_in_day
-    # yuhhhhhh
 
 
 @router.delete("/api/calendar/todos/{todo_id}")
@@ -128,3 +130,31 @@ def delete_todos_of_user(authentication: Authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
     cursor.execute("DELETE FROM todos WHERE user_id = %s", (authentication.user_id,))
     cursor.execute("DELETE FROM todos_in_day WHERE user_id = %s", (authentication.user_id,))
+
+
+def __validate_todo(authentication: Authentication, todo: ToDo):
+    if todo.userId is None:
+        raise HTTPException(detail="todo missing userId", status_code=400)
+    if authentication.user_id != todo.userId:
+        raise HTTPException(detail="User is not authenticated to create this resource", status_code=401)
+    if todo.name is None:
+        raise HTTPException(detail="todo missing a name", status_code=400)
+    elif len(todo.name) == 0:
+        raise HTTPException(detail="todo missing a name", status_code=400)
+    elif len(todo.name) > 32:
+        raise HTTPException(detail="todo name must not exceed 32 characters", status_code=400)
+    if todo.startInstant is None:
+        raise HTTPException(detail="todo missing startInstant", status_code=400)
+    if todo.endInstant is not None:
+        if todo.endInstant < todo.startInstant:
+            raise HTTPException(detail="todo has an invalid endInstant", status_code=400)
+    if (todo.recurrenceId is not None and todo.recurrenceDay is None) or \
+            (todo.recurrenceId is None and todo.recurrenceDay is not None):
+        raise HTTPException(detail="recurrenceId and recurrenceDay must either both be defined, or neither defined",
+                            status_code=400)
+    # check authentication on goalId
+    if todo.linkedGoalId is not None:
+        GoalAchievingEndpoints.get_goal(authentication, todo.linkedGoalId)
+    # check authentication on recurrenceId
+    if todo.recurrenceId is not None:
+        RecurrenceEndpoints.get_recurrence(authentication, todo.recurrenceId)

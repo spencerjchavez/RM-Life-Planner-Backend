@@ -32,3 +32,4 @@ WEEK_LONG_VACATION_EVENT = CalendarEvent(
   startInstant=time.time(),
   endInstant=(datetime.datetime.now() + datetime.timedelta(days=7)).timestamp()
 )
+

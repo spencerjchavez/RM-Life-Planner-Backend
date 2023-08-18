@@ -10,12 +10,12 @@ from models.SQLColumnNames import *
 
 class ToDo(BaseModel):
 
-    todoId: Optional[str]
+    todoId: Optional[int]
     userId: Optional[int]
 
     name: Optional[str]
     startInstant: Optional[float]
-    endInstant: Optional[float]  # overridden by timeframe in recurring ToDos
+    endInstant: Optional[float]
 
     recurrenceId: Optional[int]
     recurrenceDay: Optional[float]  # the day of the recurrence instance (user may modify the actual startInstance later, but this value won't change)

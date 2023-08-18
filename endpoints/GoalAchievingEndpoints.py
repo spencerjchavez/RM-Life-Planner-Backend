@@ -1,19 +1,18 @@
 # CREATED JUNE OF 2023 BY SPENCER CHAVEZ
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Annotated
 
-from mysql.connector.cursor import MySQLCursor
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from models.Desire import Desire
 from models.Plan import Plan
 from models.Goal import Goal
-from models.Action import Action
 from endpoints import UserEndpoints
 from models.Authentication import Authentication
 from models.SQLColumnNames import *
 import time
-from mysql.connector.cursor import MySQLCursor, Error
+from mysql.connector.cursor import MySQLCursor
 from endpoints import RecurrenceEndpoints
+import CalendarEventEndpoints
 
 desires_url = "/api/desires"
 goals_url = "/api/goals"
@@ -34,11 +33,8 @@ def create_desire(authentication: Authentication, desire: Desire):
     user_id = authentication.user_id
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
-    if user_id != desire.userId:
-        raise HTTPException(detail="bruh are you seriously trying to troll me rn? #nicetry #reported #getrekt",
-                            status_code=401)
-
     desire.dateCreated = time.time()
+    __validate_desire(authentication, desire)
     query = desire.get_sql_insert_query()
     params = desire.get_sql_insert_params()
     cursor.execute(query, params)
@@ -62,6 +58,7 @@ def get_desire(authentication: Authentication, desire_id: int):
 @router.put("/api/desires/{desire_id}")
 def update_desire(authentication: Authentication, desire_id: int, updated_desire: Desire):
     get_desire(authentication, desire_id)
+    __validate_desire(authentication, updated_desire)
     query = f"UPDATE desires SET {NAME} = %s, {DEADLINE} = %s, {DATE_RETIRED} = %s, {PRIORITY_LEVEL} = %s,  {COLOR_R} = %s, {COLOR_G} = %s, {COLOR_B} = %s WHERE desire_id = %s"
     params = (updated_desire.name, updated_desire.deadline, updated_desire.dateRetired, updated_desire.priorityLevel,
               updated_desire.colorR, updated_desire.colorG, updated_desire.colorB, desire_id)
@@ -85,6 +82,29 @@ def delete_desire(authentication: Authentication, desire_id: int):
     return f"Desire with ID {desire_id} deleted successfully"
 
 
+def __validate_desire(authentication: Authentication, desire: Desire):
+    if desire.userId is None:
+        raise HTTPException(detail="desire missing userId", status_code=400)
+    if authentication.user_id != desire.userId:
+        raise HTTPException(detail="User is not authenticated to create this resource", status_code=401)
+    if desire.name is None:
+        raise HTTPException(detail="desire missing a name", status_code=400)
+    elif len(desire.name) == 0:
+        raise HTTPException(detail="desire missing a name", status_code=400)
+    elif len(desire.name) > 42:
+        raise HTTPException(detail="desire name must not exceed 42 characters", status_code=400)
+    if desire.dateCreated is None:
+        raise HTTPException(detail="desire missing a creation date", status_code=400)
+    if desire.colorR is None or desire.colorG is None or desire.colorB is None:
+        raise HTTPException(detail="desire missing color", status_code=400)
+    if desire.colorR < 0 or desire.colorR > 1 \
+            or desire.colorB < 0 or desire.colorB > 1 \
+            or desire.colorG < 0 or desire.colorG > 1:
+        raise HTTPException(detail="desire does not define a valid color", status_code=400)
+    if desire.priorityLevel is not None:
+        if desire.priorityLevel < 0:
+            raise HTTPException(detail="desire priority level must be 0 or greater", status_code=400)
+
 #
 #
 # GOALS ENDPOINTS
@@ -95,19 +115,15 @@ def create_goal(authentication: Authentication, goal: Goal):
     user_id = authentication.user_id
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
-    if user_id != goal.userId:
-        print("ALERT ALERT ALERT: GoalAchievingEndpoint create-goal user ids didn't match: %s and %s",
-              (user_id, goal.userId))
-        raise HTTPException(detail="bruh are you seriously trying to troll me rn? #nicetry #reported #getrekt",
-                            status_code=401)
-
+    __validate_goal(authentication, goal)
     stmt = goal.get_sql_insert_query()
     params = goal.get_sql_insert_params()
     cursor.execute(stmt, params)
     goal.goalId = cursor.lastrowid
     if goal.endInstant is None:
         # insert into goals_without_deadline
-        cursor.execute("INSERT INTO goals_without_deadline (goal_id, user_id) VALUES %s, %s;", (goal.goalId, goal.user_id))
+        cursor.execute("INSERT INTO goals_without_deadline (goal_id, user_id) VALUES %s, %s;",
+                       (goal.goalId, goal.userId))
     else:
         # insert into goals_in_day
         stmt, params = goal.get_sql_goals_in_day_insert_query_and_params()
@@ -180,6 +196,7 @@ def get_goals(authentication: Authentication, days: list[float]):
 @router.put("/api/goals/{goal_id}")
 def update_goal(authentication: Authentication, goal_id: int, updated_goal: Goal):
     goal = get_goal(authentication, goal_id)["goal"]
+    __validate_goal(authentication, goal)
     cursor.execute(
         "UPDATE goals SET desire_id = %s, name = %s, how_much = %s, measuring_units = %s, start_instant = %s, deadline = %s WHERE goal_id = %s",
         (updated_goal.desireId, updated_goal.name, updated_goal.howMuch, updated_goal.measuringUnits,
@@ -208,6 +225,38 @@ def delete_goal(authentication: Authentication, goal_id: int):
     return {"message": f"Goal with ID {goal_id} deleted successfully"}
 
 
+def __validate_goal(authentication: Authentication, goal: Goal):
+    if goal.userId is None:
+        raise HTTPException(detail="goal missing userId", status_code=400)
+    if authentication.user_id != goal.userId:
+        raise HTTPException(detail="User is not authenticated to create this resource", status_code=401)
+    if goal.name is None:
+        raise HTTPException(detail="goal missing a name", status_code=400)
+    elif len(goal.name) == 0:
+        raise HTTPException(detail="goal missing a name", status_code=400)
+    elif len(goal.name) > 42:
+        raise HTTPException(detail="goal name must not exceed 42 characters", status_code=400)
+    if goal.howMuch is None:
+        raise HTTPException(detail="goal missing how much attribute", status_code=400)
+    elif goal.howMuch <= 0:
+        raise HTTPException(detail="how much attribute must be greater than 0", status_code=400)
+    if goal.measuringUnits is not None:
+        if len(goal.measuringUnits) > 12:
+            raise HTTPException(detail="measuring units cannot exceed 12 characters", status_code=400)
+    if goal.startInstant is None:
+        raise HTTPException(detail="goal missing start instant", status_code=400)
+    if goal.endInstant is not None:
+        if goal.endInstant < goal.startInstant:
+            raise HTTPException(detail="goal's end instant cannot be less than its start instant", status_code=400)
+    if goal.desireId is None:
+        raise HTTPException(detail="goal missing a linked desire", status_code=400)
+    # check authentication on desireId
+    get_desire(authentication, goal.desireId)
+    # check authentication on recurrenceId
+    if goal.recurrenceId is not None:
+        RecurrenceEndpoints.get_recurrence(authentication, goal.recurrenceId)
+
+
 #
 #
 # PLANS ENDPOINTS
@@ -221,6 +270,18 @@ def create_plan(authentication: Authentication, plan: Plan):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
     if user_id != plan.userId:
         raise HTTPException(detail="User not authorized to create this object", status_code=401)
+    # check plan's goalId
+    if plan.goalId is None:
+        raise HTTPException(detail="plan needs a goal id!", status_code=400)
+    linked_goal = get_goal(authentication, plan.goalId)
+    if linked_goal.userId != authentication.user_id:
+        raise HTTPException(detail="linked goal id does not belong to you!", status_code=400)
+    # check plan's eventId
+    if plan.eventId is None:
+        raise HTTPException(detail="plan needs an event id!", status_code=400)
+    linked_event = CalendarEventEndpoints.get_calendar_event(authentication, plan.eventId)
+    if linked_event.userId != authentication.user_id:
+        raise HTTPException(detail="linked eventId does not belong to you!", status_code=400)
     stmt = plan.get_sql_insert_query()
     params = plan.get_sql_insert_params()
     cursor.execute(stmt, params)
@@ -241,7 +302,7 @@ def get_plan(authentication: Authentication, plan_id: int):
     return {"plan": Plan.from_sql_res(res.__dict__)}
 
 
-@router.get("/api/plans/")
+@router.get("/api/plans")
 def get_plans_by_goal_id(authentication: Authentication, goal_id: int):
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
@@ -252,11 +313,36 @@ def get_plans_by_goal_id(authentication: Authentication, goal_id: int):
         plans.append(Plan.from_sql_res(res.__dict__))
     return {"plans": plans}
 
+
+@router.get("/api/plans")
+def get_plans_by_goal_ids(authentication: Authentication, goal_ids: Annotated[list[int], Query()]):
+    if not UserEndpoints.authenticate(authentication):
+        raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
+    in_stmt = ""
+    for goal_id in goal_ids:
+        in_stmt += str(goal_id) + ","
+    cursor.execute("SELECT * FROM plans WHERE goal_id IN %s", (in_stmt[:len(in_stmt) - 2]))
+    res = cursor.fetchall()
+    plansByGoalId = {}
+    for row in res:
+        if plansByGoalId[row["goal_id"]] is None:
+            plansByGoalId[row["goal_id"]] = []
+        plansByGoalId[row["goal_id"]].append(row.__dict__)
+    return {"plans": plansByGoalId}
+
+
 @router.put("/api/plans/{plan_id}")
 def update_plan(authentication: Authentication, plan_id: int, updated_plan: Plan):
-    get_plan(authentication, plan_id)
-    cursor.execute("UPDATE plans SET goal_id = %s, event_id = %s, how_much = %s WHERE plan_id = %s;",
-                   (updated_plan.goalId, updated_plan.eventId, updated_plan.howMuch, plan_id))
+    original_plan = get_plan(authentication, plan_id)["plan"]
+    if updated_plan.goalId is None:
+        updated_plan.goalId = original_plan.goalId
+    if updated_plan.eventId is None:
+        updated_plan.eventId = original_plan.eventId
+    __validate_plan(authentication, updated_plan)
+    cursor.execute(
+        "UPDATE plans SET goal_id = %s, event_id = %s, how_much = %s, howMuchAccomplished = %s, notes = %s WHERE plan_id = %s;",
+        (updated_plan.goalId, updated_plan.eventId, updated_plan.howMuch, updated_plan.howMuchAccomplished,
+         updated_plan.notes, plan_id))
     return {"message": f"Plan with ID {plan_id} updated successfully"}
 
 
@@ -269,47 +355,26 @@ def delete_plan(authentication: Authentication, plan_id: int):
     return {"message": f"Plan with ID {plan_id} deleted successfully"}
 
 
-#
-#
-# ACTIONS ENDPOINT
-#
-#
-
-
-@router.post("/api/actions")
-def create_action(authentication: Authentication, action: Action):
-    get_plan(authentication, action.planId)  # authenticate
-    stmt = action.get_sql_insert_query()
-    params = action.get_sql_insert_params()
-    cursor.execute(stmt, params)
-    action_id = cursor.lastrowid
-    return {"message": "Action created successfully", "action_id": action_id}
-
-
-@router.get("/api/actions/{action_id}")
-def get_action(authentication: Authentication, action_id: int):
-    user_id = authentication.user_id
-    if not UserEndpoints.authenticate(authentication):
-        raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
-    cursor.execute("SELECT * FROM actions WHERE action_id = %s", (action_id,))
-    res = cursor.fetchone()
-    if res is None:
-        raise HTTPException(detail="Specified resource does not exist", status_code=404)
-    if user_id != res["user_id"]:
-        raise HTTPException(detail="User is not authorized to access this object", status_code=401)
-    return {"action": Action.from_sql_res(res.__dict__)}
-
-
-@router.put("/api/actions/{action_id}")
-def update_action(authentication: Authentication, action_id: int, updated_action: Action):
-    get_action(authentication, action_id)  # authenticate
-    cursor.execute("UPDATE actions SET successful = %s, how_much_accomplished = %s, notes = %s WHERE action_id = %s",
-                   (updated_action.successful, updated_action.howMuchAccomplished, updated_action.notes, action_id))
-    return {"message": f"Action with ID {action_id} updated successfully"}
-
-
-@router.delete("/api/actions/{action_id}")
-def delete_action(authentication: Authentication, action_id: int):
-    get_action(authentication, action_id)  # authenticate
-    cursor.execute("DELETE FROM actions WHERE action_id = %s", (action_id,))
-    return "success"
+def __validate_plan(authentication: Authentication, plan: Plan):
+    if plan.userId is None:
+        raise HTTPException(detail="plan missing userId", status_code=400)
+    if authentication.user_id != plan.userId:
+        raise HTTPException(detail="User is not authenticated to create this resource", status_code=401)
+    if plan.howMuch is None:
+        raise HTTPException(detail="plan missing how much attribute", status_code=400)
+    elif plan.howMuch <= 0:
+        raise HTTPException(detail="how much attribute must be greater than 0", status_code=400)
+    if plan.howMuchAccomplished is not None:
+        if plan.howMuchAccomplished < 0:
+            raise HTTPException(detail="plan's how much accomplished attribute must be 0 or greater", status_code=400)
+    if plan.goalId is None:
+        raise HTTPException(detail="plan missing a linked goal", status_code=400)
+    if plan.notes is not None:
+        if len(plan.notes) > 300:
+            raise HTTPException(detail="plans notes must not exceed 300 characters", status_code=400)
+    # check authentication on goalId
+    get_goal(authentication, plan.goalId)
+    # check authentication on eventId
+    if plan.eventId is None:
+        raise HTTPException(detail="plan missing a linked event", status_code=400)
+    CalendarEventEndpoints.get_calendar_event(authentication, plan.eventId)
