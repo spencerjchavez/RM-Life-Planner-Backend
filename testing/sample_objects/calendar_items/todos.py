@@ -4,17 +4,17 @@ from testing.sample_objects.goal_achieving.goals import *
 APPLY_FOR_10_JOBS_TODO = ToDo(
   name=APPLY_FOR_JOB_GOAL.name,
   startInstant=time.time(),
-  deadline=APPLY_FOR_JOB_GOAL.deadline
+  endInstant=APPLY_FOR_JOB_GOAL.endInstant
 )
 DO_HOMEWORK_TODO = ToDo(
   name=DO_HOMEWORK_GOAL.name,
   startInstant=time.time(),
-  deadline=DO_HOMEWORK_GOAL.deadline
+  endInstant=DO_HOMEWORK_GOAL.endInstant
 )
 READ_SCRIPTURES_TODO = ToDo(
   name=READ_SCRIPTURES_GOAL.name,
   startInstant=time.time(),
-  deadline=READ_SCRIPTURES_GOAL.deadline
+  endInstant=READ_SCRIPTURES_GOAL.endInstant
 )
 GO_TO_STORE_TODO = ToDo(
   name="go to the store today",

@@ -1,22 +1,19 @@
 from fastapi import APIRouter, HTTPException
+from mysql.connector.cursor_cext import CMySQLCursorDict
+
 from models.Authentication import Authentication
-import mysql
-from mysql.connector.connection import MySQLCursor, Error
 from models.SQLColumnNames import *
 from datetime import datetime, timedelta
 from dateutil import relativedelta
-from models.CalendarEvent import CalendarEvent
-from models.ToDo import ToDo
-from models.Goal import Goal
 from models.Recurrence import Recurrence
 from dateutil import rrule
 from dateutil.rrule import rrulestr
 from endpoints import UserEndpoints, GoalAchievingEndpoints, CalendarToDoEndpoints, CalendarEventEndpoints
 
 router = APIRouter()
-cursor: MySQLCursor
+cursor: CMySQLCursorDict
 
-months_accessed_cache: {int: {int: {int: bool}}}  # user_id, year, month, if month has been accessed
+months_accessed_cache: {int: {int: {int: bool}}} = {}  # user_id, year, month, if month has been accessed
 
 
 @router.post("/api/calendar/recurrences")
@@ -37,6 +34,8 @@ def get_recurrence(authentication: Authentication, recurrence_id: int):
         raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
     cursor.execute("SELECT * FROM recurrences WHERE recurrence_id = %s", (recurrence_id,))
     res = cursor.fetchone()
+    if res is None:
+        raise HTTPException(detail="specified recurrence does not exist", status_code=404)
     if res["user_id"] != authentication.user_id:
         raise HTTPException(status_code=401, detail="User is not authenticated to access this resource")
     recurrence = Recurrence.from_sql_res(res.__dict__)
@@ -49,6 +48,7 @@ def update_recurrence(authentication: Authentication, recurrence_id: int, update
                       inclusive: bool):
     # authenticate
     _ = get_recurrence(authentication, recurrence_id)
+    updated_recurrence.recurrenceId = recurrence_id
     __validate_recurrence(authentication, updated_recurrence)
     delete_recurrence_instances_after_date(authentication, recurrence_id, after, inclusive)
     # insert new recurrence
@@ -203,10 +203,10 @@ def register_month_accessed_by_user(authentication: Authentication, year: int, m
     if not months_accessed_cache.get(authentication.user_id, {}).get(year, {}).get(month,
                                                                                    False):
         cursor.execute(
-            "SELECT * FROM months_accessed_by_user WHERE (user_id, year, month) = (%s, %s, %s)",
+            "SELECT * FROM months_accessed_by_user WHERE user_id = %s AND year = %s AND month = %s;",
             (authentication.user_id, year, month))
         if cursor.fetchone() is None:  # month has not been accessed before
-            cursor.execute("INSERT INTO months_accessed_by_user (%s, %s, %s)",
+            cursor.execute("INSERT INTO months_accessed_by_user VALUES (%s, %s, %s)",
                            (authentication.user_id, year, month))
             __generate_recurrence_instances_for_month(authentication, year, month)
         months_accessed_cache.setdefault(authentication.user_id, {}).setdefault(year, {})[

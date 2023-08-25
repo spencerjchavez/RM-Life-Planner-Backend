@@ -3,16 +3,16 @@ from datetime import datetime, timedelta
 from typing import Optional, Annotated
 
 from fastapi import APIRouter, HTTPException, Query
+from mysql.connector.cursor_cext import CMySQLCursorDict
+
 from models.Desire import Desire
 from models.Plan import Plan
 from models.Goal import Goal
-from endpoints import UserEndpoints
+from endpoints import UserEndpoints, CalendarEventEndpoints
 from models.Authentication import Authentication
 from models.SQLColumnNames import *
 import time
-from mysql.connector.cursor import MySQLCursor
 from endpoints import RecurrenceEndpoints
-import CalendarEventEndpoints
 
 desires_url = "/api/desires"
 goals_url = "/api/goals"
@@ -24,7 +24,7 @@ desire_categories_per_user_limit = 10
 goals_per_desire_limit = 20
 
 router = APIRouter()
-cursor: MySQLCursor
+cursor: CMySQLCursorDict
 
 
 # DESIRE ENDPOINTS
@@ -49,15 +49,16 @@ def get_desire(authentication: Authentication, desire_id: int):
     cursor.execute("SELECT * FROM desires WHERE desire_id = %s", (desire_id,))
     res = cursor.fetchone()
     if res is None:
-        return "no such desire_id found!", 404
+        raise HTTPException(detail="no such desire exists", status_code=404)
     if res["user_id"] != user_id:
         raise HTTPException(detail="User is not authenticated to access this resource", status_code=401)
-    return {"message": "successfully got desire", "desire": Desire.from_sql_res(res.__dict__)}
+    return {"message": "successfully got desire", "desire": Desire.from_sql_res(res)}
 
 
 @router.put("/api/desires/{desire_id}")
 def update_desire(authentication: Authentication, desire_id: int, updated_desire: Desire):
     get_desire(authentication, desire_id)
+    updated_desire.desireId = desire_id
     __validate_desire(authentication, updated_desire)
     query = f"UPDATE desires SET {NAME} = %s, {DEADLINE} = %s, {DATE_RETIRED} = %s, {PRIORITY_LEVEL} = %s,  {COLOR_R} = %s, {COLOR_G} = %s, {COLOR_B} = %s WHERE desire_id = %s"
     params = (updated_desire.name, updated_desire.deadline, updated_desire.dateRetired, updated_desire.priorityLevel,
@@ -79,6 +80,7 @@ def delete_desire(authentication: Authentication, desire_id: int):
         raise HTTPException(detail="User is not authorized to access this resource", status_code=401)
 
     cursor.execute("DELETE FROM desires WHERE desire_id = %s", (desire_id,))
+    _ = cursor.fetchone()
     return f"Desire with ID {desire_id} deleted successfully"
 
 
@@ -110,6 +112,7 @@ def __validate_desire(authentication: Authentication, desire: Desire):
 # GOALS ENDPOINTS
 #
 #
+
 @router.post("/api/goals")
 def create_goal(authentication: Authentication, goal: Goal):
     user_id = authentication.user_id
@@ -122,7 +125,7 @@ def create_goal(authentication: Authentication, goal: Goal):
     goal.goalId = cursor.lastrowid
     if goal.endInstant is None:
         # insert into goals_without_deadline
-        cursor.execute("INSERT INTO goals_without_deadline (goal_id, user_id) VALUES %s, %s;",
+        cursor.execute("INSERT INTO goals_without_deadline (goal_id, user_id) VALUES (%s, %s);",
                        (goal.goalId, goal.userId))
     else:
         # insert into goals_in_day
@@ -132,7 +135,7 @@ def create_goal(authentication: Authentication, goal: Goal):
     return {"message": "Goal created successfully", "goal_id": goal.goalId}
 
 
-@router.get("/api/goals/{goal_id}")
+@router.get("/api/goals/by-goal-id/{goal_id}")
 def get_goal(authentication: Authentication, goal_id: int):
     user_id = authentication.user_id
     if not UserEndpoints.authenticate(authentication):
@@ -143,11 +146,11 @@ def get_goal(authentication: Authentication, goal_id: int):
         raise HTTPException(detail="No goal of specified id found", status_code=404)
     if res["user_id"] != user_id:
         raise HTTPException(detail="User is not authorized to access this resource", status_code=401)
-    return {"goal: ": Goal.from_sql_res(res.__dict__)}
+    return {"goal": Goal.from_sql_res(res)}
 
 
-@router.get("/api/goals")
-def get_goals(authentication: Authentication, start_day: float, end_day: Optional[float] = None):
+@router.get("/api/goals/by-days-range")
+def get_goals_by_days_range(authentication: Authentication, start_day: float, end_day: Optional[float] = None):
     if end_day is None:
         end_day = start_day
     dt = datetime.fromtimestamp(start_day)
@@ -157,11 +160,11 @@ def get_goals(authentication: Authentication, start_day: float, end_day: Optiona
         days.append(dt.timestamp())
         dt += timedelta(days=1)
 
-    return get_goals(authentication, days)
+    return get_goals_by_days_list(authentication, days)
 
 
-@router.get("/api/goals")
-def get_goals(authentication: Authentication, days: list[float]):
+@router.get("/api/goals/by-days-list")
+def get_goals_by_days_list(authentication: Authentication, days: list[float]):
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
     in_clause = ""
@@ -185,22 +188,25 @@ def get_goals(authentication: Authentication, days: list[float]):
         cursor.execute("SELECT * FROM goals WHERE goal_id IN"
                        "(SELECT goal_id FROM goals_in_day WHERE user_id = %s AND day = %s)",
                        (authentication.user_id, day))
-        goals_by_day[day] = []
+        day_str = str(int(day))
+        goals_by_day[day_str] = []
         for row in cursor.fetchall():
-            goals_by_day[day].append(Goal.from_sql_res(row.__dict__))
+            goals_by_day[day_str].append(Goal.from_sql_res(row))
         for goal_without_deadline in goals_without_deadline:
-            goals_by_day[day].append(Goal.from_sql_res(goal_without_deadline.__dict__))
+            if goal_without_deadline[START_INSTANT] <= day:
+                goals_by_day[day_str].append(Goal.from_sql_res(goal_without_deadline))
     return {"goals": goals_by_day}
 
 
 @router.put("/api/goals/{goal_id}")
 def update_goal(authentication: Authentication, goal_id: int, updated_goal: Goal):
     goal = get_goal(authentication, goal_id)["goal"]
-    __validate_goal(authentication, goal)
+    updated_goal.goalId = goal_id
+    __validate_goal(authentication, updated_goal)
     cursor.execute(
-        "UPDATE goals SET desire_id = %s, name = %s, how_much = %s, measuring_units = %s, start_instant = %s, deadline = %s WHERE goal_id = %s",
+        "UPDATE goals SET desire_id = %s, name = %s, how_much = %s, measuring_units = %s, start_instant = %s, end_instant = %s WHERE goal_id = %s",
         (updated_goal.desireId, updated_goal.name, updated_goal.howMuch, updated_goal.measuringUnits,
-         updated_goal.startInstant, updated_goal.deadline, goal_id))
+         updated_goal.startInstant, updated_goal.endInstant, goal_id))
     if goal.startInstant != updated_goal.startInstant or \
             (goal.endInstant is not None and goal.endInstant != updated_goal.endInstant):
         # time changed
@@ -212,15 +218,9 @@ def update_goal(authentication: Authentication, goal_id: int, updated_goal: Goal
 
 @router.delete("/api/goals/{goal_id}")
 def delete_goal(authentication: Authentication, goal_id: int):
-    if not UserEndpoints.authenticate(authentication):
-        raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
-    cursor.execute("SELECT * FROM goals WHERE goal_id = %s", (goal_id,))
-    res = cursor.fetchone()
-    if res is None:
-        raise HTTPException(status_code=404, detail="Goal not found")
-    if res["user_id"] != authentication.user_id:
-        raise HTTPException(detail="User not authorized to access this resource", status_code=401)
-
+    get_goal(authentication, goal_id)
+    cursor.execute("DELETE FROM goals_in_day WHERE goal_id = %s", (goal_id,))
+    cursor.execute("DELETE FROM goals_without_deadline WHERE goal_id = %s", (goal_id,))
     cursor.execute("DELETE FROM goals WHERE goal_id = %s", (goal_id,))
     return {"message": f"Goal with ID {goal_id} deleted successfully"}
 
@@ -268,20 +268,7 @@ def create_plan(authentication: Authentication, plan: Plan):
     user_id = authentication.user_id
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
-    if user_id != plan.userId:
-        raise HTTPException(detail="User not authorized to create this object", status_code=401)
-    # check plan's goalId
-    if plan.goalId is None:
-        raise HTTPException(detail="plan needs a goal id!", status_code=400)
-    linked_goal = get_goal(authentication, plan.goalId)
-    if linked_goal.userId != authentication.user_id:
-        raise HTTPException(detail="linked goal id does not belong to you!", status_code=400)
-    # check plan's eventId
-    if plan.eventId is None:
-        raise HTTPException(detail="plan needs an event id!", status_code=400)
-    linked_event = CalendarEventEndpoints.get_calendar_event(authentication, plan.eventId)
-    if linked_event.userId != authentication.user_id:
-        raise HTTPException(detail="linked eventId does not belong to you!", status_code=400)
+    __validate_plan(authentication, plan)
     stmt = plan.get_sql_insert_query()
     params = plan.get_sql_insert_params()
     cursor.execute(stmt, params)
@@ -299,7 +286,7 @@ def get_plan(authentication: Authentication, plan_id: int):
         raise HTTPException(detail="no such plan exists", status_code=404)
     if authentication.user_id != res["user_id"]:
         raise HTTPException(detail="User is not authorized to access this object", status_code=401)
-    return {"plan": Plan.from_sql_res(res.__dict__)}
+    return {"plan": Plan.from_sql_res(res)}
 
 
 @router.get("/api/plans")
@@ -310,7 +297,7 @@ def get_plans_by_goal_id(authentication: Authentication, goal_id: int):
     res_list = cursor.fetchall()
     plans = []
     for res in res_list:
-        plans.append(Plan.from_sql_res(res.__dict__))
+        plans.append(Plan.from_sql_res(res))
     return {"plans": plans}
 
 
@@ -327,13 +314,14 @@ def get_plans_by_goal_ids(authentication: Authentication, goal_ids: Annotated[li
     for row in res:
         if plansByGoalId[row["goal_id"]] is None:
             plansByGoalId[row["goal_id"]] = []
-        plansByGoalId[row["goal_id"]].append(row.__dict__)
+        plansByGoalId[row["goal_id"]].append(row)
     return {"plans": plansByGoalId}
 
 
 @router.put("/api/plans/{plan_id}")
 def update_plan(authentication: Authentication, plan_id: int, updated_plan: Plan):
     original_plan = get_plan(authentication, plan_id)["plan"]
+    updated_plan.planId = plan_id
     if updated_plan.goalId is None:
         updated_plan.goalId = original_plan.goalId
     if updated_plan.eventId is None:

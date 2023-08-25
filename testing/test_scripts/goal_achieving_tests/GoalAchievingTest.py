@@ -20,9 +20,6 @@ class GoalAchievingEndpointsTest:
         plans_tests = PlansTests(self.base_url, user_tests, desire_tests, goals_tests, event_tests)
 
         # reset database
-        print("resetting databases")
-        res = requests.post("http://localhost:8000/api/testing/reset_tables")
-        print("databases successfully reset")
         print("starting desires test")
         desire_tests.launch_test()
         print("passed desire test!")

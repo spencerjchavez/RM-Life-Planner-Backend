@@ -1,19 +1,18 @@
-use database1;
+use u679652356_rm_lp_db_test;
 
-drop table actions;
-drop table plans;
 drop table alerts;
-drop table events_in_day;
-drop table events;
-drop table todos_in_day;
+drop table months_accessed_by_user;
 drop table todos_without_deadline;
-drop table todos;
-drop table goals_in_day;
 drop table goals_without_deadline;
+drop table events_in_day;
+drop table todos_in_day;
+drop table goals_in_day;
+drop table plans;
+drop table events;
+drop table todos;
 drop table goals;
 drop table recurrences;
 drop table desires;
-drop table months_accessed_by_user;
 drop table users;
 
 
@@ -22,7 +21,7 @@ create table users (
     username varchar(24) not null,
     hashed_password tinyblob not null,
     salt tinyblob not null,
-    date_joined bigint not null,
+    date_joined double not null,
     email varchar(42),
     google_calendar_id varchar(84)
 );
@@ -42,9 +41,9 @@ create table desires(
     desire_id bigint unsigned not null primary key auto_increment,
     name varchar(42) not null,
     user_id int unsigned not null,
-    date_created bigint not null,
-    deadline bigint,
-    date_retired bigint,
+    date_created double not null,
+    deadline double,
+    date_retired double,
     priority_level int,
     color_r float unsigned not null,
     color_g float unsigned not null,
@@ -57,7 +56,7 @@ create table recurrences (
     recurrence_id bigint unsigned not null primary key auto_increment,
     user_id int unsigned not null,
     rrule_string varchar(64) not null,
-    start_instant bigint not null,
+    start_instant double not null,
 
     -- recurrent event stuff
     event_name varchar(64),
@@ -86,14 +85,14 @@ create table goals(
     name varchar(42) not null,
     how_much float not null,
     measuring_units varchar(12),
-    start_instant bigint not null,
-    end_instant bigint, -- null == goal is indefinite.
+    start_instant double not null,
+    end_instant double, -- null == goal is indefinite.
     -- recurring goal stuff
     recurrence_id bigint unsigned,
-    recurrence_day bigint,
+    recurrence_day double,
 
     FOREIGN KEY (recurrence_id) REFERENCES recurrences(recurrence_id),
-    FOREIGN KEY (desire_id)REFERENCES desires(desire_id),
+    FOREIGN KEY (desire_id) REFERENCES desires(desire_id),
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 CREATE INDEX desire_id_index ON goals(desire_id);
@@ -101,15 +100,16 @@ CREATE INDEX recurrence_id_and_day_index ON goals(recurrence_id, recurrence_day)
 
 create table goals_without_deadline(
     goal_id BIGINT UNSIGNED NOT NULL,
-    user_id BIGINT UNSIGNED NOT NULL,
-    FOREIGN KEY (goal_id) REFERENCES goals(goal_id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id),
-    PRIMARY KEY (goal_id)
+    user_id INT UNSIGNED NOT NULL,
+
+    PRIMARY KEY (goal_id),
+    FOREIGN KEY (goal_id) REFERENCES goals(goal_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
-CREATE INDEX user_id_index ON users(user_id) ON DELETE CASCADE;
+CREATE INDEX user_id_index ON users(user_id);
 
 create table goals_in_day(
-    day bigint not null,
+    day double not null,
     goal_id bigint unsigned not null,
     user_id int unsigned not null,
 
@@ -124,18 +124,18 @@ create table todos(
     user_id int unsigned not null,
 
     name varchar(32),
-    start_instant bigint not null,
-    deadline bigint,
+    start_instant double not null,
+    deadline double,
 
     recurrence_id bigint unsigned,
-    recurrence_day bigint,
+    recurrence_day double,
     linked_goal_id bigint unsigned,
 
     FOREIGN KEY (linked_goal_id) REFERENCES goals(goal_id),
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (recurrence_id) REFERENCES recurrences(recurrence_id)
 );
-CREATE INDEX recurrence_id_and_day_index ON todos(recurrence_id, recurrence_day)
+CREATE INDEX recurrence_id_and_day_index ON todos(recurrence_id, recurrence_day);
 
 CREATE TABLE todos_without_deadline(
     todo_id bigint unsigned not null,
@@ -148,7 +148,7 @@ CREATE TABLE todos_without_deadline(
 CREATE INDEX user_index ON todos_without_deadline (user_id);
 
 create table todos_in_day(
-    day bigint not null,
+    day double not null,
     todo_id bigint unsigned not null,
     user_id int unsigned not null,
 
@@ -163,14 +163,14 @@ create table events(
     user_id int unsigned not null,
     name varchar(64),
     description varchar(500),
-    is_hidden bool not null,
-    start_instant bigint not null,
-    end_instant bigint not null,
+    is_hidden bit not null,
+    start_instant double not null,
+    end_instant double not null,
 
     linked_goal_id bigint unsigned,
     linked_todo_id bigint unsigned,
     recurrence_id bigint unsigned,
-    recurrence_day bigint,
+    recurrence_day double,
 
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (linked_goal_id) REFERENCES goals(goal_id),
@@ -178,10 +178,10 @@ create table events(
     FOREIGN KEY (recurrence_id) REFERENCES recurrences(recurrence_id)
 );
 CREATE INDEX todo_id_index ON events (linked_todo_id);
-CREATE INDEX recurrence_id_and_day_index ON events(recurrence_id, recurrence_day)
+CREATE INDEX recurrence_id_and_day_index ON events(recurrence_id, recurrence_day);
 
 create table events_in_day(
-    day bigint not null,
+    day double not null,
     event_id bigint unsigned not null,
     user_id int unsigned not null,
 
@@ -207,7 +207,7 @@ create table plans(
     event_id bigint unsigned not null,
     how_much float not null,
     how_much_accomplished float,
-    notes varchar[300],
+    notes varchar(300),
 
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (goal_id) REFERENCES goals(goal_id) ON DELETE CASCADE,
@@ -215,16 +215,3 @@ create table plans(
 );
 CREATE INDEX goal_id_index ON plans(goal_id);
 CREATE INDEX event_id_index ON plans(event_id);
-
-create table actions(
-    plan_id bigint unsigned primary key not null,
-    user_id int unsigned not null,
-    successful int,
-    how_much_accomplished float,
-    notes varchar(1000),
-
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    FOREIGN KEY (plan_id) REFERENCES plans (plan_id) ON DELETE CASCADE
-);
-CREATE INDEX user_id_index ON actions(user_id);
-CREATE INDEX event_id_index ON actions(event_id);

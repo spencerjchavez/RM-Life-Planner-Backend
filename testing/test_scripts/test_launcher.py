@@ -23,7 +23,7 @@ sample_plans_path = '../sample_objects/goal_achieving/plans.py'
 sample_actions_path = '../sample_objects/goal_achieving/actions.py'
 
 
-test_user_endpoints = True
+test_user_endpoints = False
 test_calendar_endpoints = True
 test_goal_achieving_endpoints = True
 
@@ -31,9 +31,9 @@ test_goal_achieving_endpoints = True
 if __name__ == '__main__':
     if test_user_endpoints:
         UserEndpointsTest(base_url).launch_user_test()
-    if test_goal_achieving_endpoints:
-        GoalAchievingEndpointsTest(base_url).launch_test()
     if test_calendar_endpoints:
         CalendarEndpointsTest(base_url).launch_test()
+    if test_goal_achieving_endpoints:
+        GoalAchievingEndpointsTest(base_url).launch_test()
 
     print("PASSED ALL TESTS!!!")

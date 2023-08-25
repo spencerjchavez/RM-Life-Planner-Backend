@@ -41,7 +41,7 @@ RECURRENCE_DAY = "recurrence_day"
 # goals
 GOAL_ID = "goal_id"
 HOW_MUCH = "how_much"
-MEASURING_UNITS = "measuring units"
+MEASURING_UNITS = "measuring_units"
 TIMEFRAME = "timeframe"
 
 # events and todos

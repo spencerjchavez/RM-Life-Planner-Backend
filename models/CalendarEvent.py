@@ -40,10 +40,12 @@ class CalendarEvent(BaseModel):
 
     def get_sql_events_in_day_insert_query_and_params(self):
         days = CalendarEvent.get_days_in_range(self.startInstant, self.endInstant)
-        values_str = ""
+        stmt_str = "INSERT INTO events_in_day (day, event_id, user_id) VALUES "
+        params = ()
         for day in days:
-            values_str += (",(%s, %s, %s)" % day, self.eventId, self.userId)
-        return "INSERT INTO events_in_day VALUES (day, event_id, user_id) VALUES %s, ;", (values_str[1:])
+            stmt_str += "(%s, %s, %s),"
+            params += (day, self.eventId, self.userId)
+        return stmt_str[:len(stmt_str) - 1], params
 
     @staticmethod
     def get_days_in_range(start: float, end: float):  # is inclusive
@@ -55,7 +57,7 @@ class CalendarEvent(BaseModel):
         while dt <= end_dt:
             days.append(dt.timestamp())
             dt += datetime.timedelta(days=1)
-        return [days]
+        return days
 
     @staticmethod
     def from_sql_res(src: dict):

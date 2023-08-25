@@ -56,13 +56,13 @@ class RecurrenceTests:
         )
         recurrence_id = self.test_create_recurrence(recurrence, authentication)
         event = self.event_tests.test_get_events(self.start_time_1.timestamp(), authentication)[self.start_time_1.timestamp()]
-        assert(event.name == recurrence.eventName)
+        assert event.name == recurrence.eventName
         # update recurrence and assert change with get
         updated_recurrence = recurrence
         updated_recurrence.eventName = "updated event recurrence"
         self.test_update_recurrence(recurrence_id, updated_recurrence, authentication)
         event = self.event_tests.test_get_events(self.start_time_1.timestamp(), authentication)[self.start_time_1.timestamp()]
-        assert(event.name == updated_recurrence.eventName)
+        assert event.name == updated_recurrence.eventName
         # delete recurrence
         self.test_delete_recurrence(recurrence_id, authentication)
 
@@ -77,14 +77,14 @@ class RecurrenceTests:
         recurrence_id = self.test_create_recurrence(recurrence, authentication)
         todo = self.todo_tests.test_get_todos(self.start_time_1.timestamp(), authentication)[
             self.start_time_1.timestamp()][0]
-        assert (todo["name"] == recurrence.todoName)
+        assert todo["name"] == recurrence.todoName
         # update recurrence and assert change with get
         updated_recurrence = recurrence
         updated_recurrence.todoName = "updated event recurrence"
         self.test_update_recurrence(recurrence_id, updated_recurrence, authentication)
         todo = self.todo_tests.test_get_todos(self.start_time_1.timestamp(), authentication)[
             self.start_time_1.timestamp()][0]
-        assert (todo["name"] == updated_recurrence.todoName)
+        assert todo["name"] == updated_recurrence.todoName
         # delete recurrence
         self.test_delete_recurrence(recurrence_id, authentication)
 
@@ -114,14 +114,14 @@ class RecurrenceTests:
         # test
         goal = self.goal_tests.test_get_goals(self.start_time_1.timestamp(), authentication)[
             self.start_time_1.timestamp()][0]
-        assert (goal["name"] == recurrence.goalName)
+        assert goal["name"] == recurrence.goalName
         # update recurrence and assert change with get
         updated_recurrence = recurrence
         updated_recurrence.goalName = "updated event recurrence"
         self.test_update_recurrence(recurrence_id, updated_recurrence, authentication)
         goal = self.goal_tests.test_get_goals(self.start_time_1.timestamp(), authentication)[
             self.start_time_1.timestamp()][0]
-        assert (goal["name"] == updated_recurrence.goalName)
+        assert goal["name"] == updated_recurrence.goalName
         # clean up
         self.test_delete_recurrence(recurrence_id, authentication)
 
@@ -157,35 +157,35 @@ class RecurrenceTests:
         assert(len(events_by_days) == 3)  # assert that 3 days have events
         # assert that each day has the correct event
         for events_in_day in events_by_days.keys():
-            assert(events_in_day[0]["name"] == daily_recurrence.eventName)
+            assert events_in_day[0]["name"] == daily_recurrence.eventName
 
         # update to weekly recurrence, check that daily recurrences were deleted and get new recurrences
         self.test_update_recurrence(recurrence_id, weekly_recurrence, authentication)
         events = self.event_tests.test_get_events(weekly_recurrence.startInstant, authentication)
-        assert(len(events) == 1)
-        assert(events[0]["name"] == weekly_recurrence.eventName)
+        assert len(events) == 1
+        assert events[0]["name"] == weekly_recurrence.eventName
         events = self.event_tests.test_get_events((datetime.datetime.fromtimestamp(yearly_recurrence.startInstant) + dateutil.relativedelta.relativedelta(weeks=1)).timestamp(), authentication)
-        assert(len(events) == 1)
-        assert(events[0]["name"] == yearly_recurrence.eventName)
+        assert len(events) == 1
+        assert events[0]["name"] == yearly_recurrence.eventName
         # check all daily events were deleted
         no_events_here = self.event_tests.test_get_events(weekly_recurrence.startInstant + datetime.timedelta(days=2).total_seconds(), authentication)
-        assert(len(no_events_here) == 0)
+        assert len(no_events_here) == 0
         # update to monthly recurrence and test get
         self.test_update_recurrence(recurrence_id, monthly_recurrence, authentication)
         events = self.event_tests.test_get_events(monthly_recurrence.startInstant, authentication)
-        assert(len(events) == 1)
-        assert(events[0]["name"] == monthly_recurrence.eventName)
+        assert len(events) == 1
+        assert events[0]["name"] == monthly_recurrence.eventName
         events = self.event_tests.test_get_events((datetime.datetime.fromtimestamp(yearly_recurrence.startInstant) + dateutil.relativedelta.relativedelta(months=1)).timestamp(), authentication)
-        assert(len(events) == 1)
-        assert(events[0]["name"] == yearly_recurrence.eventName)
+        assert len(events) == 1
+        assert events[0]["name"] == yearly_recurrence.eventName
         # update to yearly recurrence and test get
         self.test_update_recurrence(recurrence_id, yearly_recurrence, authentication)
         events = self.event_tests.test_get_events(yearly_recurrence.startInstant, authentication)
-        assert(len(events) == 1)
-        assert(events[0]["name"] == yearly_recurrence.eventName)
+        assert len(events) == 1
+        assert events[0]["name"] == yearly_recurrence.eventName
         events = self.event_tests.test_get_events((datetime.datetime.fromtimestamp(yearly_recurrence.startInstant) + dateutil.relativedelta.relativedelta(years=1)).timestamp(), authentication)
-        assert(len(events) == 1)
-        assert(events[0]["name"] == yearly_recurrence.eventName)
+        assert len(events) == 1
+        assert events[0]["name"] == yearly_recurrence.eventName
 
         # update to sunday and friday recurrence and test get for startInstant and 1 week after the startInstant
         self.test_update_recurrence(recurrence_id, sunday_friday_recurrence, authentication)
@@ -194,7 +194,7 @@ class RecurrenceTests:
         assert(events[0]["name"] == sunday_friday_recurrence.eventName)
         events = self.event_tests.test_get_events((datetime.datetime.fromtimestamp(sunday_friday_recurrence.startInstant) + datetime.timedelta(weeks=1)).timestamp(), authentication)
         assert (len(events) == 1)
-        assert (events[0]["name"] == sunday_friday_recurrence.eventName)
+        assert events[0]["name"] == sunday_friday_recurrence.eventName
         # clean up
         self.test_delete_recurrence(recurrence_id, authentication)
 
@@ -278,7 +278,7 @@ class RecurrenceTests:
     def test_get_recurrence(self, recurrence_id: int, authentication: Authentication,
                             expected_response_code: int = 200):
         res = requests.get(self.recurrence_url + "/" + str(recurrence_id),
-                           json=authentication.json())
+                           json=authentication.__dict__)
         compare_responses(res, expected_response_code)
         return res.json()["recurrence"]
 
@@ -292,5 +292,5 @@ class RecurrenceTests:
 
     def test_delete_recurrence(self, recurrence_id: int, authentication: Authentication,
                                expected_response_code: int = 200):
-        res = requests.delete(self.recurrence_url + "/" + str(recurrence_id), json=authentication.json())
+        res = requests.delete(self.recurrence_url + "/" + str(recurrence_id), json=authentication.__dict__)
         compare_responses(res, expected_response_code)

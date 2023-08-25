@@ -39,10 +39,12 @@ class Goal(BaseModel):
         if self.endInstant is None:
             raise ValueError()
         days = CalendarEvent.get_days_in_range(self.startInstant, self.endInstant)
-        values_str = ""
+        stmt_str = "INSERT INTO goals_in_day (day, goal_id, user_id) VALUES "
+        params = ()
         for day in days:
-            values_str += (",(%s, %s, %s)" % day, self.goalId, self.userId)
-        return "INSERT INTO events_in_day (day, event_id, user_id) VALUES %s ;", (values_str[1:])
+            stmt_str += "(%s, %s, %s),"
+            params += (day, self.goalId, self.userId)
+        return stmt_str[:len(stmt_str)-1], params
 
     @staticmethod
     def from_sql_res(src: dict):

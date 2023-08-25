@@ -36,6 +36,8 @@ class UserEndpointsTest:
             return res.json()["user"]
 
     def test_update_user(self, updated_user: User, authentication: Authentication, expected_response_code: int = 200):
+        if updated_user.userId is None:
+            updated_user.userId = authentication.user_id
         res = requests.put(self.users_url + "/" + str(authentication.user_id),
                            json=create_authenticated_request_body("updated_user", updated_user, authentication))
         compare_responses(res, expected_response_code)

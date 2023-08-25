@@ -5,14 +5,14 @@ import re
 
 import bcrypt
 from fastapi import APIRouter, HTTPException
-import mysql
-from mysql.connector.connection import MySQLCursor, Error
+from mysql.connector.cursor_cext import CMySQLCursorDict
+
 from models.Authentication import Authentication
 from models.User import User
 
 
 router = APIRouter()
-cursor: MySQLCursor
+cursor: CMySQLCursorDict
 
 
 api_keys_by_userId = {}
@@ -106,9 +106,11 @@ def get_user(authentication: Authentication, user_id: int):
         raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
     cursor.execute("SELECT * FROM users WHERE user_id = %s;", (user_id,))
     user = cursor.fetchone()
+    if user is None:
+        raise HTTPException(detail="specified user does not exist", status_code=404)
     if user["user_id"] != user_id or authentication.user_id != user_id:
         raise HTTPException(status_code=401, detail="User is not authenticated to access this resource")
-    return {"message": "successfully got user", "user": User.from_sql_res(user.__dict__)}
+    return {"message": "successfully got user", "user": User.from_sql_res(user)}
 
 
 def get_user_with_login_info(user_id: int):
@@ -122,11 +124,14 @@ def update_user(authentication: Authentication, user_id: int, updated_user: User
     if not authenticate(authentication):
         raise HTTPException(status_code=401, detail="User could not be authenticatied, please log in")
     res = get_user_with_login_info(user_id)
+    updated_user.userId = user_id
     if updated_user.password is not None:
         updated_user.hashedPassword = bcrypt.hashpw(updated_user.password.encode("utf-8"),
                                                     res["salt"])
     else:
         updated_user.hashedPassword = res["hashed_password"]
+    updated_user.salt = res["salt"]
+    updated_user.dateJoined = res["date_joined"]
     __validate_user(updated_user)
     cursor.execute("UPDATE users SET hashed_password = %s, email = %s, google_calendar_id = %s WHERE user_id = %s;",
                    (updated_user.hashedPassword,
@@ -140,13 +145,15 @@ def delete_user(authentication: Authentication, user_id: int):
     user_id = authentication.user_id
     if not authenticate(authentication):
         raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
-    cursor.execute("DELETE FROM actions WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM alerts WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM plans WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM todos_without_deadline WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM todos_in_day WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM todos WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM events_in_day WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM events WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM alerts WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM goals_without_deadline WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM goals_in_day WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM goals WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
@@ -171,7 +178,6 @@ def authenticate(authentication: Authentication):
 
     if user_id is None or api_key is None:
         return False
-    print(f"trying to authenticate {user_id} with api_key {api_key}")
     try:
         curr_key = api_keys_by_userId[user_id]
         if curr_key is None:
@@ -179,12 +185,10 @@ def authenticate(authentication: Authentication):
         if curr_key['api_key'] == api_key and curr_key['time_created'] + API_TIMEOUT_SECS > time.time():
             # update time_created
             api_keys_by_userId[user_id]['time_created'] = time.time()
-            print("user " + user_id.__str__() + " authenticated!")
             return True
     except KeyError:
         # invalid user_id provided
         return False
-    print("invalid user_id and api_key combo. Cannot authenticate.")
     return False
 
 

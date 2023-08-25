@@ -17,13 +17,14 @@ class GoalsTests:
     def __init__(self, base_url: str, user_tests: UserEndpointsTest, desire_tests: DesiresTests):
         self.base_url = base_url
         self.goals_url = base_url + "/goals"
+        self.get_goals_by_days_list = self.goals_url + "/by-days-list"
+        self.get_goals_by_days_range = self.goals_url + "/by-days-range"
         self.user_tests = user_tests
         self.desire_tests = desire_tests
         self.start_time = datetime.datetime(day=4, month=7, year=1999).timestamp()
         self.start_time2 = datetime.datetime(day=5, month=8, year=1999).timestamp()
 
     def launch_test(self):
-        print("starting event tests")
         print("resetting the database")
         requests.post(self.base_url + "/testing/reset_tables")
         print("databases successfully reset")
@@ -53,7 +54,8 @@ class GoalsTests:
             userId=authentication.user_id,
             name="my goal",
             howMuch=1,
-            startInstant=self.start_time
+            startInstant=self.start_time,
+            endInstant=self.start_time + 10000
         )
         updated_goal = goal
         updated_goal.name = "updated goal"
@@ -61,22 +63,23 @@ class GoalsTests:
         goal_id = self.test_create_goal(goal, authentication)
         self.test_update_goal(goal_id, updated_goal, authentication)
         goal_retrieved = self.test_get_goal(goal_id, authentication)
-        assert(goal_retrieved["name"] == updated_goal.name)
+        assert goal_retrieved["name"] == updated_goal.name
         # test get goals by day
-        goals_retrieved = self.test_get_goals(self.start_time, authentication)[self.start_time]
-        assert(len(goals_retrieved) == 1)
-        assert(goals_retrieved[0]["name"] == updated_goal.name)
-        goals_retrieved = self.test_get_goals(self.start_time2, authentication)[self.start_time2]
-        assert(len(goals_retrieved) == 0)
+        goals_retrieved = self.test_get_goals(self.start_time, authentication)[str(int(self.start_time))]
+        assert len(goals_retrieved) == 1
+        assert goals_retrieved[0]["name"] == updated_goal.name
+        goals_retrieved = self.test_get_goals(self.start_time2, authentication)[str(int(self.start_time2))]
+        assert len(goals_retrieved) == 0
         # updated startInstant and check again
         updated_goal.startInstant = self.start_time2
+        updated_goal.endInstant = updated_goal.startInstant + 10000
         self.test_update_goal(goal_id, updated_goal, authentication)
-        goals = self.test_get_goals(self.start_time2, authentication)[self.start_time2]
-        assert(len(goals) == 1)
+        goals = self.test_get_goals(self.start_time2, authentication)[str(int(self.start_time2))]
+        assert len(goals) == 1
         self.test_delete_goal(goal_id, authentication)
         # assert that delete worked
-        goals_retrieved = self.test_get_goals(self.start_time2, authentication)[self.start_time2]
-        assert (len(goals_retrieved) == 0)
+        goals_retrieved = self.test_get_goals(self.start_time2, authentication)[str(int(self.start_time2))]
+        assert len(goals_retrieved) == 0
 
     def test_malformed_inputs(self, authentication: Authentication, another_authentication: Authentication,
                                   desire_id: int):
@@ -93,7 +96,7 @@ class GoalsTests:
             howMuch=1,
             startInstant=self.start_time
         )
-        self.test_create_goal(bad_goal, authentication, 400)  # bad desireId
+        self.test_create_goal(bad_goal, authentication, 404)  # bad desireId
         bad_goal.desireId = desire_id
         bad_goal.howMuch = -1
         self.test_create_goal(bad_goal, authentication, 400)  # bad howMuch
@@ -120,7 +123,7 @@ class GoalsTests:
         bad_goal = good_goal
         bad_goal.desireId -= 1
         # test
-        self.test_update_goal(good_goal_id, bad_goal, authentication, 400)  # bad desireId
+        self.test_update_goal(good_goal_id, bad_goal, authentication, 404)  # bad desireId
         bad_goal.desireId = desire_id
         bad_goal.howMuch = -1
         self.test_update_goal(good_goal_id, bad_goal, authentication, 400)  # bad howMuch
@@ -158,19 +161,22 @@ class GoalsTests:
     def test_create_goal(self, goal: Goal, authentication: Authentication, expected_response_code: int = 200):
         res = requests.post(self.goals_url, json=create_authenticated_request_body("goal", goal, authentication))
         compare_responses(res, expected_response_code)
-        return res.json()["goal_id"]
+        if expected_response_code == 200:
+            return res.json()["goal_id"]
 
     def test_get_goal(self, goal_id: int, authentication: Authentication, expected_response_code: int = 200):
         res = requests.get(self.goals_url + "/" + str(goal_id),
-                           json=authentication.json())
+                           json=authentication.__dict__)
         compare_responses(res, expected_response_code)
-        return res.json()["goal"]
+        if expected_response_code == 200:
+            return res.json()["goal"]
 
     def test_get_goals(self, start_day: Optional[float], authentication: Authentication,
                             expected_response_code: int = 200):
-        res = requests.get(self.goals_url, params={"start_day": start_day}, json=authentication.json())
+        res = requests.get(self.get_goals_by_days_range, params={"start_day": start_day}, json=authentication.__dict__)
         compare_responses(res, expected_response_code)
-        return res.json()["goals"]
+        if expected_response_code == 200:
+            return res.json()["goals"]
 
     def test_update_goal(self, goal_id: int, updated_goal: Goal, authentication: Authentication,
                            expected_response_code: int = 200):
@@ -179,5 +185,5 @@ class GoalsTests:
         compare_responses(res, expected_response_code)
 
     def test_delete_goal(self, goal_id: int, authentication: Authentication, expected_response_code: int = 200):
-        res = requests.delete(self.goals_url + "/" + str(goal_id), json=authentication.json())
+        res = requests.delete(self.goals_url + "/" + str(goal_id), json=authentication.__dict__)
         compare_responses(res, expected_response_code)

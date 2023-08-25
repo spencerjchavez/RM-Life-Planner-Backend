@@ -151,13 +151,15 @@ class PlansTests:
     def test_create_plan(self, plan: Plan, authentication: Authentication, expected_response_code: int = 200):
         res = requests.post(self.plans_url, json=create_authenticated_request_body("plan", plan, authentication))
         compare_responses(res, expected_response_code)
-        return res.json()["plan_id"]
+        if expected_response_code == 200:
+            return res.json()["plan_id"]
 
     def test_get_plan(self, plan_id: int, authentication: Authentication, expected_response_code: int = 200):
         res = requests.get(self.plans_url + "/" + str(plan_id),
-                           json=authentication.json())
+                           json=authentication.__dict__)
         compare_responses(res, expected_response_code)
-        return res
+        if expected_response_code == 200:
+            return res.json()["plan"]
 
     def test_update_plan(self, plan_id: int, updated_plan: Plan, authentication: Authentication,
                            expected_response_code: int = 200):
@@ -166,5 +168,5 @@ class PlansTests:
         compare_responses(res, expected_response_code)
 
     def test_delete_plan(self, plan_id: int, authentication: Authentication, expected_response_code: int = 200):
-        res = requests.delete(self.plans_url + "/" + str(plan_id), json=authentication.json())
+        res = requests.delete(self.plans_url + "/" + str(plan_id), json=authentication.__dict__)
         compare_responses(res, expected_response_code)

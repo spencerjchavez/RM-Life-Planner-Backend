@@ -7,7 +7,7 @@ from testing.sample_objects.calendar_items.todos import *
 GO_TO_STORE_EVENT = CalendarEvent(
   name=GO_TO_STORE_TODO.name,
   description="go to the walmart in springville",
-  startInstant=datetime.datetime.now(),
+  startInstant=datetime.datetime.now().timestamp(),
   endInstant=(datetime.datetime.now() + datetime.timedelta(minutes=20)).timestamp()
 )
 READ_SCRIPTURES_EVENT = CalendarEvent(

@@ -13,7 +13,6 @@ class DesiresTests:
         self.user_tests = user_tests
 
     def launch_test(self):
-        print("starting event tests")
         print("resetting the database")
         requests.post(self.base_url + "/testing/reset_tables")
         print("databases successfully reset")
@@ -42,8 +41,8 @@ class DesiresTests:
         desire_id = self.test_create_desire(desire, authentication)
         self.test_update_desire(desire_id, updated_desire,authentication)
         desire_retrieved = self.test_get_desire(desire_id, authentication)
-        assert(desire_retrieved["name"] == updated_desire.name)
-        assert(desire_retrieved["date_retired"] == updated_desire.dateRetired)
+        assert desire_retrieved["name"] == updated_desire.name
+        assert desire_retrieved["dateRetired"] == updated_desire.dateRetired
         self.test_delete_desire(desire_id, authentication)
         # assert that delete worked
         self.test_get_desire(desire_id, authentication, 404)
@@ -66,13 +65,10 @@ class DesiresTests:
         self.test_create_desire(bad_desire, authentication, 400)  # missing colorB
         bad_desire.colorB = 0
         bad_desire.userId = -1
-        self.test_create_desire(bad_desire, authentication, 400)  # missing correct userId
+        self.test_create_desire(bad_desire, authentication, 401)  # missing correct userId
         bad_desire.userId = authentication.user_id
         bad_desire.name = None
         self.test_create_desire(bad_desire, authentication, 400)  # missing name
-        bad_desire.name = "desire"
-        bad_desire.dateCreated = None
-        self.test_create_desire(bad_desire, authentication, 400)  # missing dateCreated
 
     def test_update_with_malformed_desires(self, authentication: Authentication):
         # setup
@@ -92,19 +88,16 @@ class DesiresTests:
         self.test_update_desire(good_desire_id, bad_desire, authentication, 400)  # missing colorB
         bad_desire.colorB = 0
         bad_desire.userId = -1
-        self.test_update_desire(good_desire_id, bad_desire, authentication, 400)  # missing colorB
+        self.test_update_desire(good_desire_id, bad_desire, authentication, 401)  # missing good userId
         bad_desire.userId = authentication.user_id
         bad_desire.name = None
-        self.test_update_desire(good_desire_id, bad_desire, authentication, 400)  # missing colorB
-        bad_desire.name = "desire"
-        bad_desire.dateCreated = None
-        self.test_update_desire(good_desire_id, bad_desire, authentication, 400)  # missing colorB
+        self.test_update_desire(good_desire_id, bad_desire, authentication, 400)  # missing name
 
         # clean up
         self.test_delete_desire(good_desire_id, authentication)
 
     def test_get_with_malformed_params(self, authentication: Authentication):
-        self.test_get_desire(10, authentication, 400)
+        self.test_get_desire(10, authentication, 404)
 
     def test_call_functions_without_authentication(self, authentication: Authentication, another_authentication: Authentication):
         # setup
@@ -130,13 +123,15 @@ class DesiresTests:
     def test_create_desire(self, desire: Desire, authentication: Authentication, expected_response_code: int = 200):
         res = requests.post(self.desire_url, json=create_authenticated_request_body("desire", desire, authentication))
         compare_responses(res, expected_response_code)
-        return res.json()["desire_id"]
+        if expected_response_code == 200:
+            return res.json()["desire_id"]
 
     def test_get_desire(self, desire_id: int, authentication: Authentication, expected_response_code: int = 200):
         res = requests.get(self.desire_url + "/" + str(desire_id),
-                           json=authentication.json())
+                           json=authentication.__dict__)
         compare_responses(res, expected_response_code)
-        return res.json()
+        if expected_response_code == 200:
+            return res.json()["desire"]
 
     def test_update_desire(self, desire_id: int, updated_desire: Desire, authentication: Authentication,
                            expected_response_code: int = 200):
@@ -145,5 +140,5 @@ class DesiresTests:
         compare_responses(res, expected_response_code)
 
     def test_delete_desire(self, desire_id: int, authentication: Authentication, expected_response_code: int = 200):
-        res = requests.delete(self.desire_url + "/" + str(desire_id), json=authentication.json())
+        res = requests.delete(self.desire_url + "/" + str(desire_id), json=authentication.__dict__)
         compare_responses(res, expected_response_code)

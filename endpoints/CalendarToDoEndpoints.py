@@ -1,20 +1,18 @@
 import datetime
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
-import mysql
-from mysql.connector.cursor import MySQLCursor, Error
+from mysql.connector.cursor_cext import CMySQLCursorDict
+
 from models.ToDo import ToDo
 from models.Authentication import Authentication
 from models.SQLColumnNames import *
 from endpoints import UserEndpoints, RecurrenceEndpoints, GoalAchievingEndpoints
 
-# TODO: make sure IN ALL ENDPOINTS when a user creates a resource the user_id matches
-
 MEASURING_UNIT_CHAR_LIMIT = 12
 router = APIRouter()
-cursor: MySQLCursor
+cursor: CMySQLCursorDict
 
 
 @router.post("/api/calendar/todos")
@@ -37,18 +35,20 @@ def create_todo(authentication: Authentication, todo: ToDo):
     return {"message": "todo successfully added", "todo_id": todo.todoId}
 
 
-@router.get("/api/calendar/todos")
+@router.get("/api/calendar/todos/by-todo-id/{todo_id}")
 def get_todo(authentication: Authentication, todo_id: int):
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
     cursor.execute("SELECT * FROM todos WHERE todo_id = %s", (todo_id,))
     res = cursor.fetchone()
+    if res is None:
+        raise HTTPException(detail="specified todo does not exist", status_code=404)
     if res["user_id"] != authentication.user_id:
         raise HTTPException(detail="User is not authenticated to access this resource", status_code=401)
-    return {"todo": ToDo.from_sql_res(res.__dict__)}
+    return {"todo": ToDo.from_sql_res(res)}
 
-@router.get("/api/calendar/todos")
-def get_todos(authentication: Authentication, days: list[float]):
+@router.get("/api/calendar/todos/by-days-list")
+def get_todos_by_days_list(authentication: Authentication, days: list[float]):
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
     if len(days) == 0:
@@ -72,17 +72,19 @@ def get_todos(authentication: Authentication, days: list[float]):
         cursor.execute("SELECT * FROM todos WHERE todo_id IN"
                        "(SELECT todo_id FROM todos_in_day WHERE user_id = %s AND day = %s)",
                        (authentication.user_id, day))
-        todos_by_day[day] = []
+        day_str = str(int(day))
+        todos_by_day[day_str] = []
         for row in cursor.fetchall():
-            todos_by_day[day].append(ToDo.from_sql_res(row.__dict__))
+            todos_by_day[day_str].append(ToDo.from_sql_res(row))
         for todo_without_deadline in todos_without_deadline:
-            todos_by_day[day].append(ToDo.from_sql_res(todo_without_deadline.__dict__))
+            if todo_without_deadline[START_INSTANT] <= day:
+                todos_by_day[day_str].append(ToDo.from_sql_res(todo_without_deadline))
     return {"todos": todos_by_day}
     # todo: check if lazy loading is implemented here / if it would be faster if we fetched results outside of these loops
 
 
-@router.get("/api/calendar/todos")
-def get_todos(authentication: Authentication, start_day: float, end_day: Optional[float] = None):
+@router.get("/api/calendar/todos/by-days-range")
+def get_todos_by_days_range(authentication: Authentication, start_day: float, end_day: Optional[float] = None):
     # authenticates in later call to get_todos(Authentication, list[float])
     dt = datetime.fromtimestamp(start_day)
     if end_day is None:
@@ -94,21 +96,22 @@ def get_todos(authentication: Authentication, start_day: float, end_day: Optiona
     while dt.timestamp() <= end_day:
         dt.replace(hour=0, minute=0, second=0, microsecond=0)
         days.append(dt.timestamp())
-        dt += datetime.timedelta(days=1)
+        dt += timedelta(days=1)
 
-    return get_todos(authentication, days)
+    return get_todos_by_days_list(authentication, days)
 
 
 @router.put("/api/calendar/todos/{todo_id}")
 def update_calendar_todo(authentication: Authentication, todo_id: int, updated_todo: ToDo):
     todo = get_todo(authentication, todo_id)["todo"]
+    updated_todo.todoId = todo_id
     __validate_todo(authentication, todo)
     cursor.execute(
-        "UPDATE todos SET %s = %s, %s = %s, %s = %s, %s = %s WHERE todo_id = %s",
-        (NAME, updated_todo.name,
-         START_INSTANT, updated_todo.startInstant,
-         END_INSTANT, updated_todo.endInstant,
-         LINKED_GOAL_ID, updated_todo.linkedGoalId,
+        f"UPDATE todos SET {NAME} = %s, {START_INSTANT} = %s, {END_INSTANT} = %s, {LINKED_GOAL_ID} = %s WHERE todo_id = %s",
+        (updated_todo.name,
+         updated_todo.startInstant,
+         updated_todo.endInstant,
+         updated_todo.linkedGoalId,
          todo_id))
     if todo.startInstant != updated_todo.startInstant or todo.endInstant != updated_todo.endInstant:
         cursor.execute("DELETE FROM todos_in_day WHERE todo_id = %s", (todo_id,))
@@ -119,8 +122,9 @@ def update_calendar_todo(authentication: Authentication, todo_id: int, updated_t
 @router.delete("/api/calendar/todos/{todo_id}")
 def delete_todo(authentication: Authentication, todo_id: int):
     get_todo(authentication, todo_id)  # authenticate
-    cursor.execute("DELETE FROM todos WHERE todo_id = %s", (todo_id,))
     cursor.execute("DELETE FROM todos_in_day WHERE todo_id = %s", (todo_id,))
+    cursor.execute("DELETE FROM todos_without_deadline WHERE todo_id = %s", (todo_id,))
+    cursor.execute("DELETE FROM todos WHERE todo_id = %s", (todo_id,))
     return f"successfully deleted todo with id: '{todo_id}'"
 
 

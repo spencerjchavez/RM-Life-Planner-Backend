@@ -1,6 +1,4 @@
 from dateutil import relativedelta
-from models.ToDo import ToDo
-from models.Authentication import Authentication
 import requests
 from testing.test_scripts.TestingHelperFunctions import *
 from ..UserEndpointsTest import UserEndpointsTest
@@ -12,6 +10,8 @@ class ToDoTests:
 
     def __init__(self, base_url: str):
         self.todo_url = base_url + "/todos"
+        self.get_todos_by_days_list_url = self.todo_url + "/by-days-list"
+        self.get_todos_by_days_range_url = self.todo_url + "/by-days-range"
         self.base_url = base_url
         self.user_tests = UserEndpointsTest(base_url)
 
@@ -95,7 +95,7 @@ class ToDoTests:
 
         # get todos by day, should return nothing
         events = self.test_get_todos(start_time_1.timestamp(), authentication)
-        assert (len(events) == 0)
+        assert len(events) == 0
 
         # create todos
         one_day_todos = []
@@ -111,11 +111,11 @@ class ToDoTests:
 
         for todo in one_day_todos:
             todo_received = self.test_get_todo(todo.todoId, authentication)
-            assert (todo.dict() == todo_received.dict())
+            assert todo.dict() == todo_received.dict()
 
-        todos_received = self.test_get_todos(start_time_1.timestamp(), authentication)[start_time_1.timestamp()]
+        todos_received = self.test_get_todos(start_time_1.timestamp(), authentication)[str(int(start_time_1.timestamp()))]
         for todo in one_day_todos:
-            assert (todos_received.index(todo) >= 0)
+            assert todos_received.index(todo) >= 0
 
         # update todos startInstants
         for todo in one_day_todos:
@@ -125,7 +125,7 @@ class ToDoTests:
             self.test_update_todo(todo.todoId, new_todo, authentication)
 
         assert (len(
-            self.test_get_todos(start_time_2.timestamp(), authentication)[start_time_2.timestamp()]) == len(
+            self.test_get_todos(start_time_2.timestamp(), authentication)[str(int(start_time_2.timestamp()))]) == len(
             one_day_todos))
 
         # delete todos
@@ -152,14 +152,14 @@ class ToDoTests:
 
         # test get todos by day
         day = start_time_1 + datetime.timedelta(days=7)
-        todos = self.test_get_todos(day.timestamp(), authentication)[day.timestamp()]
-        assert (len(todos) == 7)
+        todos = self.test_get_todos(day.timestamp(), authentication)[str(int(day.timestamp()))]
+        assert len(todos) == 7
 
         todos = self.test_get_todos(start_time_1.timestamp(),
                                       (start_time_1 + datetime.timedelta(days=60)).timestamp(), authentication)
-        assert (len(events) == 50)
-        assert (len(events[start_time_1.timestamp()]) == 1)
-        assert (len(events[(start_time_1 + datetime.timedelta(days=1)).timestamp()]) == 2)
+        assert len(events) == 50
+        assert len(events[str(int(start_time_1.timestamp()))]) == 1
+        assert len(events[str(int((start_time_1 + datetime.timedelta(days=1)).timestamp()))]) == 2
 
         # cleanup
         for todo in week_long_todos:
@@ -179,14 +179,14 @@ class ToDoTests:
         return res.json()["todo"]
 
     def test_get_todos(self, start_day: float, authentication: Authentication, expected_response_code: int = 200):
-        res = requests.get(self.todo_url, params={"start_day": start_day},
+        res = requests.get(self.get_todos_by_days_list_url, params={"start_day": start_day},
                            json=authentication.json())
         compare_responses(res, expected_response_code)
         return res.json()["todos"]
 
     def test_get_todos(self, start_day: float, end_day: float, authentication: Authentication,
                        expected_response_code: int = 200):
-        res = requests.get(self.todo_url, params={"start_day": start_day, "end_day": end_day},
+        res = requests.get(self.get_todos_by_days_range_url, params={"start_day": start_day, "end_day": end_day},
                            json=authentication.json())
         compare_responses(res, expected_response_code)
         return res.json()["todos"]
