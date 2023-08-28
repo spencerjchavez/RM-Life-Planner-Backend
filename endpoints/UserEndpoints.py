@@ -1,3 +1,4 @@
+import datetime
 import random
 import string
 import time
@@ -5,6 +6,7 @@ import re
 
 import bcrypt
 from fastapi import APIRouter, HTTPException
+from mysql.connector import MySQLConnection
 from mysql.connector.cursor_cext import CMySQLCursorDict
 
 from models.Authentication import Authentication
@@ -13,6 +15,7 @@ from models.User import User
 
 router = APIRouter()
 cursor: CMySQLCursorDict
+db: MySQLConnection
 
 
 api_keys_by_userId = {}
@@ -49,9 +52,8 @@ def register_user(user: User):
 
     if is_username_in_use(user.username)["is_in_use"] ==\
             "True":
-        print(f"username {user.username} already exists")
         raise HTTPException(detail="Username already in use", status_code=400)
-    date_joined = time.time()
+    date_joined = datetime.datetime.now().strftime("%Y-%m-%d")
     # hash password
     password = user.password
     salt = bcrypt.gensalt()
@@ -65,7 +67,7 @@ def register_user(user: User):
     stmt = user.get_sql_insert_query()
     params = user.get_sql_insert_params()
     cursor.execute(stmt, params)
-
+    
     return login_user(user.username, password)
 
 
@@ -96,6 +98,7 @@ def logout_user(user_id: int, authentication: Authentication):
     if not authenticate(authentication):
         raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
     api_keys_by_userId[user_id] = None
+    
     return "User successfully logged out"
 
 
@@ -118,7 +121,6 @@ def get_user_with_login_info(user_id: int):
     return cursor.fetchone()
 
 
-
 @router.put("/api/users/{user_id}")
 def update_user(authentication: Authentication, user_id: int, updated_user: User):
     if not authenticate(authentication):
@@ -138,7 +140,9 @@ def update_user(authentication: Authentication, user_id: int, updated_user: User
                     updated_user.email,
                     updated_user.googleCalendarId,
                     user_id))
+    
     return "successfully updated"
+
 
 @router.delete("/api/users/{user_id}")
 def delete_user(authentication: Authentication, user_id: int):
@@ -146,22 +150,15 @@ def delete_user(authentication: Authentication, user_id: int):
     if not authenticate(authentication):
         raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
     cursor.execute("DELETE FROM alerts WHERE user_id = %s", (user_id,))
-    cursor.execute("DELETE FROM plans WHERE user_id = %s", (user_id,))
-    cursor.execute("DELETE FROM todos_without_deadline WHERE user_id = %s", (user_id,))
-    cursor.execute("DELETE FROM todos_in_day WHERE user_id = %s", (user_id,))
-    cursor.execute("DELETE FROM todos WHERE user_id = %s", (user_id,))
-    cursor.execute("DELETE FROM events_in_day WHERE user_id = %s", (user_id,))
-    cursor.execute("DELETE FROM events WHERE user_id = %s", (user_id,))
-    cursor.execute("DELETE FROM alerts WHERE user_id = %s", (user_id,))
-    cursor.execute("DELETE FROM goals_without_deadline WHERE user_id = %s", (user_id,))
-    cursor.execute("DELETE FROM goals_in_day WHERE user_id = %s", (user_id,))
-    cursor.execute("DELETE FROM goals WHERE user_id = %s", (user_id,))
-    cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
-    cursor.execute("DELETE FROM desires WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM months_accessed_by_user WHERE user_id = %s", (user_id,))
-    cursor.execute("DELETE FROM users WHERE user_id = %s;", (user_id,))
+    cursor.execute("DELETE FROM events WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM todos WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM goals WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM desires WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
     del api_keys_by_userId[user_id]
     print("deleted user of id: " + user_id.__str__())
+    
     return "successfully deleted!"
 
 

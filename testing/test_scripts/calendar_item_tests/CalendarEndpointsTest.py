@@ -1,4 +1,3 @@
-from typing import Any
 
 from testing.test_scripts.calendar_item_tests.CalendarEventTests import CalendarEventTests
 from testing.test_scripts.goal_achieving_tests.GoalsTests import GoalsTests
@@ -6,6 +5,7 @@ from testing.test_scripts.goal_achieving_tests.DesiresTests import DesiresTests
 from ..UserEndpointsTest import UserEndpointsTest
 from testing.test_scripts.calendar_item_tests.ToDoTests import ToDoTests
 from testing.test_scripts.calendar_item_tests.RecurrenceTests import RecurrenceTests
+
 
 class CalendarEndpointsTest:
 
@@ -17,21 +17,14 @@ class CalendarEndpointsTest:
         self.alerts_url = base_url + "/calendar/alerts"
 
         self.user_tests = UserEndpointsTest(base_url)
-        self.calendar_event_tests = CalendarEventTests(self.base_url, self.user_tests)
-        self.todo_tests = ToDoTests(self.todos_url)
         self.desire_tests = DesiresTests(base_url, self.user_tests)
         self.goal_tests = GoalsTests(base_url, self.user_tests, self.desire_tests)
-        self.recurrence_tests = RecurrenceTests(self.recurrences_url, self.user_tests, self.calendar_event_tests, self.todo_tests, self.goal_tests, self.desire_tests)
+        self.todo_tests = ToDoTests(self.base_url, self.desire_tests, self.goal_tests)
+        self.calendar_event_tests = CalendarEventTests(self.base_url, self.user_tests, self.desire_tests, self.goal_tests, self.todo_tests)
+        self.recurrence_tests = RecurrenceTests(self.base_url, self.user_tests, self.calendar_event_tests, self.todo_tests, self.goal_tests, self.desire_tests)
         # self.alert_tests = AlertTests(self.alerts_url)
 
     def launch_test(self):
-        # TEST CALENDAR EVENTS
-        print("starting calendar events test")
         self.calendar_event_tests.launch_test()
-        print("passed calendar events test!")
-        print("starting todo test")
         self.todo_tests.launch_test()
-        print("passed todo test!")
-        print("starting recurrence test!")
         self.recurrence_tests.launch_test()
-        print("passed recurrence test!")
