@@ -2,9 +2,9 @@ FROM python:3.9
 
 ENV PYTHONPATH "${PYTHONPATH}:/app"
 
-COPY requirements.txt requirements.txt
+COPY requirements.txt ./requirements.txt
 
-RUN pip3 install --no-cache-dir --upgrade -r requirements.txt
+RUN pip3 install --no-cache-dir --upgrade -r ./requirements.txt
 
 COPY ./app /app
 
