@@ -45,10 +45,10 @@ class AppMiddleware(BaseHTTPMiddleware):
         try:
             print("initializing db connection")
             db_connection = Connect(
-                host='154.56.47.154',
-                database='u679652356_rm_lp_db_test',
-                user='u679652356_admin',
-                password='&OQT+W!?3mEh:2[0imK6a',
+                host='localhost',
+                database='rm_lifeplanner_db',
+                user='server',
+                password='9a55XTl41chbUM3N2h13KWWM1u8Y0o4Dbn5H9y0F',
                 autocommit=True
             )
             AppMiddleware.db_connection = db_connection
