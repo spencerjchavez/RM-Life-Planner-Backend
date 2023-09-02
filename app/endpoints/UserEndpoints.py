@@ -79,13 +79,16 @@ def is_username_in_use(username: str):
 
 @router.post("/api/users/login")
 def login_user(username: str, password: str):
-    cursor.execute("SELECT * FROM users WHERE username = %s;", (username,))
+    cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
     res = cursor.fetchone()
+    print("test")
     if res is None:
         raise HTTPException(status_code=404, detail="username or password is incorrect")
     password = password.encode("utf-8")
     salt = res["salt"]
     hashed_password = bcrypt.hashpw(password, salt)
+    print("db_pw: " + res["hashed_password"].decode("utf-8"))
+    print("pw: " + hashed_password.decode("utf-8"))
     if res["hashed_password"] == hashed_password:
         #successfully logged in!
         return {"authentication": gen_api_key(res["user_id"])}
