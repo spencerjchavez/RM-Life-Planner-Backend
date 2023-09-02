@@ -6,7 +6,7 @@ Requests==2.31.0
 starlette==0.27.0
 uvicorn==0.23.2
 python-dateutil~=2.8.2
-bcrypt~=4.0.1
 mysql==0.0.3
 mysql_connector_python==8.1.0
-
+app==0.0.1
+mysql-connector-python==8.1.0
