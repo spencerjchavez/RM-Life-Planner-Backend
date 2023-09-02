@@ -13,7 +13,6 @@ create table users (
     user_id int unsigned primary key auto_increment,
     username varchar(24) not null,
     hashed_password tinyblob not null,
-    salt tinyblob not null,
     date_joined DATE not null,
     email varchar(42),
     google_calendar_id varchar(84)

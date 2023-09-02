@@ -60,7 +60,6 @@ def register_user(user: User):
     hashed_password = bcrypt.hashpw(password.encode("utf-8"), salt)
 
     user.dateJoined = date_joined
-    user.salt = salt
     user.hashedPassword = hashed_password
 
     # insert user into database
@@ -84,9 +83,7 @@ def login_user(username: str, password: str):
     if res is None:
         raise HTTPException(status_code=404, detail="username or password is incorrect")
     password = password.encode("utf-8")
-    salt = res["salt"]
-    hashed_password = bcrypt.hashpw(password, salt)
-    if res["hashed_password"] == hashed_password:
+    if bcrypt.checkpw(password, res["hashed_password"]):
         #successfully logged in!
         return {"authentication": gen_api_key(res["user_id"])}
     raise HTTPException(status_code=401, detail="username or password is incorrect")
@@ -198,8 +195,6 @@ def __validate_user(user: User):
         raise HTTPException(detail="user must define a username between 1 and 24 characters long", status_code=400)
     if user.hashedPassword is None:
         raise HTTPException(detail="user must define a password", status_code=400)
-    if user.salt is None:
-        raise HTTPException(detail="user must have a salt", status_code=400)
     if user.dateJoined is None:
         raise HTTPException(detail="user must define a date joined attribute", status_code=400)
     if user.email is None:
