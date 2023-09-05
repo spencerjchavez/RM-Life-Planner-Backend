@@ -1,6 +1,7 @@
 import requests
 from TestingHelperFunctions import *
 from app.models.Authentication import Authentication
+from app.testing.sample_objects.Users import *
 
 
 class UserEndpointsTest:
