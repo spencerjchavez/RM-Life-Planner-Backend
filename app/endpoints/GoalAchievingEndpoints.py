@@ -44,7 +44,8 @@ def create_desire(authentication: Authentication, desire: Desire):
 
 
 @router.get("/api/desires/{desire_id}")
-def get_desire(authentication: Authentication, desire_id: int):
+def get_desire(auth_user: int, api_key: str, desire_id: int):
+    authentication = Authentication(auth_user, api_key)
     user_id = authentication.user_id
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
@@ -59,7 +60,7 @@ def get_desire(authentication: Authentication, desire_id: int):
 
 @router.put("/api/desires/{desire_id}")
 def update_desire(authentication: Authentication, desire_id: int, updated_desire: Desire):
-    get_desire(authentication, desire_id)
+    get_desire(authentication.user_id, authentication.api_key, desire_id)
     updated_desire.desireId = desire_id
     __validate_desire(authentication, updated_desire)
     query = f"UPDATE desires SET {NAME} = %s, {DEADLINE} = %s, {DATE_RETIRED} = %s, {PRIORITY_LEVEL} = %s,  {COLOR_R} = %s, {COLOR_G} = %s, {COLOR_B} = %s WHERE desire_id = %s"
@@ -132,7 +133,8 @@ def create_goal(authentication: Authentication, goal: Goal):
 
 
 @router.get("/api/goals/by-goal-id/{goal_id}")
-def get_goal(authentication: Authentication, goal_id: int):
+def get_goal(auth_user: int, api_key: str, goal_id: int):
+    authentication = Authentication(auth_user, api_key)
     user_id = authentication.user_id
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
@@ -146,7 +148,8 @@ def get_goal(authentication: Authentication, goal_id: int):
 
 
 @router.get("/api/goals/in-date-range")
-def get_goals_in_date_range(authentication: Authentication, start_date: str, end_date: Optional[str] = None):
+def get_goals_in_date_range(auth_user: int, api_key: str, start_date: str, end_date: Optional[str] = None):
+    authentication = Authentication(auth_user, api_key)
     if end_date is None:
         end_date = start_date
     if not validate_date(start_date) or not validate_date(end_date):
@@ -176,7 +179,8 @@ def get_goals_in_date_range(authentication: Authentication, start_date: str, end
 
 
 @router.get("/api/goals/in-date-list")
-def get_goals_in_date_list(authentication: Authentication, dates: list[str]):
+def get_goals_in_date_list(auth_user: int, api_key: str, dates: list[str]):
+    authentication = Authentication(auth_user, api_key)
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
     year_months = set()
@@ -232,7 +236,7 @@ def get_active_goals_on_date(authentication: Authentication, user_id: int, date:
 
 @router.put("/api/goals/{goal_id}")
 def update_goal(authentication: Authentication, goal_id: int, updated_goal: Goal):
-    goal = get_goal(authentication, goal_id)["goal"]
+    goal = get_goal(authentication.user_id, authentication.api_key, goal_id)["goal"]
     updated_goal.goalId = goal_id
     __validate_goal(authentication, updated_goal)
     cursor.execute(
@@ -245,7 +249,7 @@ def update_goal(authentication: Authentication, goal_id: int, updated_goal: Goal
 
 @router.delete("/api/goals/{goal_id}")
 def delete_goal(authentication: Authentication, goal_id: int):
-    get_goal(authentication, goal_id)
+    get_goal(authentication.user_id, authentication.api_key, goal_id)
     cursor.execute("DELETE FROM goals WHERE goal_id = %s", (goal_id,))
     
     return {"message": f"Goal with ID {goal_id} deleted successfully"}
@@ -284,7 +288,7 @@ def __validate_goal(authentication: Authentication, goal: Goal):
     if goal.desireId is None:
         raise HTTPException(detail="goal missing a linked desire", status_code=400)
     # check authentication on desireId
-    desire = get_desire(authentication, goal.desireId)["desire"]
+    desire = get_desire(authentication.user_id, authentication.api_key, goal.desireId)["desire"]
     if desire.dateRetired is not None:  # desire is no longer active
         raise HTTPException(
             detail="linked desire is no longer active. Reactivate it or create a different desire to use.",
@@ -295,4 +299,4 @@ def __validate_goal(authentication: Authentication, goal: Goal):
                             status_code=400)
     # check authentication on recurrenceId
     if goal.recurrenceId is not None:
-        RecurrenceEndpoints.get_recurrence(authentication, goal.recurrenceId)
+        RecurrenceEndpoints.get_recurrence(authentication.user_id, authentication.api_key, goal.recurrenceId)

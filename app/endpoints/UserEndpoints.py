@@ -101,8 +101,9 @@ def logout_user(user_id: int, authentication: Authentication):
 
 
 @router.get("/api/users/{user_id}")
-def get_user(authentication: Authentication, user_id: int):
-    user_id = authentication.user_id
+def get_user(auth_user: int, api_key: str, user_id: int):
+    user_id = auth_user
+    authentication = Authentication(user_id, api_key)
     if not authenticate(authentication):
         raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
     cursor.execute("SELECT * FROM users WHERE user_id = %s;", (user_id,))

@@ -34,7 +34,8 @@ def create_todo(authentication: Authentication, todo: ToDo):
 
 
 @router.get("/api/calendar/todos/by-todo-id/{todo_id}")
-def get_todo(authentication: Authentication, todo_id: int):
+def get_todo(auth_user: int, api_key: str, todo_id: int):
+    authentication = Authentication(auth_user, api_key)
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
     cursor.execute("SELECT * FROM todos WHERE todo_id = %s", (todo_id,))
@@ -47,7 +48,8 @@ def get_todo(authentication: Authentication, todo_id: int):
 
 
 @router.get("/api/calendar/todos/in-date-list")
-def get_todos_by_dates_list(authentication: Authentication, dates: list[str]):
+def get_todos_by_dates_list(auth_user: int, api_key: str, dates: list[str]):
+    authentication = Authentication(auth_user, api_key)
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
     if len(dates) == 0:
@@ -87,7 +89,8 @@ def get_todos_by_dates_list(authentication: Authentication, dates: list[str]):
 
 
 @router.get("/api/calendar/todos/in-date-range")
-def get_todos_in_date_range(authentication: Authentication, start_date: str, end_date: Optional[str] = None):
+def get_todos_in_date_range(auth_user: int, api_key: str, start_date: str, end_date: Optional[str] = None):
+    authentication = Authentication(auth_user, api_key)
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
     if end_date is None:
@@ -127,8 +130,8 @@ def get_todos_in_date_range(authentication: Authentication, start_date: str, end
 
 
 @router.get("/api/calendar/todos/by-goal-id/{goal_id}")
-def get_todos_by_goal_id(authentication: Authentication, goal_id: int):
-    GoalAchievingEndpoints.get_goal(authentication, goal_id)
+def get_todos_by_goal_id(auth_user: int, api_key: str, goal_id: int):
+    GoalAchievingEndpoints.get_goal(auth_user, api_key, goal_id)
     cursor.execute("SELECT * FROM todos WHERE linked_goal_id = %s", (goal_id,))
     res = cursor.fetchall()
     todos = []
@@ -138,7 +141,8 @@ def get_todos_by_goal_id(authentication: Authentication, goal_id: int):
 
 
 @router.get("/api/calendar/todos/by-goal-id/")
-def get_todos_by_goal_ids(authentication: Authentication, goal_ids: list[int]):
+def get_todos_by_goal_ids(auth_user: int, api_key: str, goal_ids: list[int]):
+    authentication = Authentication(auth_user, api_key)
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
     in_clause = ""
@@ -175,7 +179,7 @@ def get_active_todos(authentication: Authentication, user_id: int):
 
 @router.put("/api/calendar/todos/{todo_id}")
 def update_calendar_todo(authentication: Authentication, todo_id: int, updated_todo: ToDo):
-    todo = get_todo(authentication, todo_id)["todo"]
+    todo = get_todo(authentication.user_id, authentication.api_key, todo_id)["todo"]
     updated_todo.todoId = todo_id
     __validate_todo(authentication, updated_todo)
     if todo.linkedGoalId != updated_todo.linkedGoalId:  # need to update child events with new goal id
@@ -196,7 +200,7 @@ def update_calendar_todo(authentication: Authentication, todo_id: int, updated_t
 
 @router.delete("/api/calendar/todos/{todo_id}")
 def delete_todo(authentication: Authentication, todo_id: int):
-    get_todo(authentication, todo_id)  # authenticate
+    get_todo(authentication.user_id, authentication.api_key, todo_id)  # authenticate
     cursor.execute("DELETE FROM todos WHERE todo_id = %s", (todo_id,))
     
     return f"successfully deleted todo with id: '{todo_id}'"
@@ -207,7 +211,6 @@ def delete_todos_of_user(authentication: Authentication):
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
     cursor.execute("DELETE FROM todos WHERE user_id = %s", (authentication.user_id,))
-    
 
 
 def __validate_todo(authentication: Authentication, todo: ToDo):
@@ -239,10 +242,10 @@ def __validate_todo(authentication: Authentication, todo: ToDo):
     if todo.howMuchPlanned <= 0:
         raise HTTPException(detail="todo must define how much planned > 0", status_code=400)
     if todo.linkedGoalId is not None:
-        GoalAchievingEndpoints.get_goal(authentication, todo.linkedGoalId)
+        GoalAchievingEndpoints.get_goal(authentication.user_id, authentication.api_key, todo.linkedGoalId)
           # check authentication on recurrenceId
     if todo.recurrenceId is not None:
-        RecurrenceEndpoints.get_recurrence(authentication, todo.recurrenceId)
+        RecurrenceEndpoints.get_recurrence(authentication.user_id, authentication.api_key, todo.recurrenceId)
     if (todo.recurrenceId is not None and todo.recurrenceDate is None) or \
             (todo.recurrenceId is None and todo.recurrenceDate is not None):
         raise HTTPException(detail="recurrenceId and recurrenceDay must either both be defined, or neither defined",

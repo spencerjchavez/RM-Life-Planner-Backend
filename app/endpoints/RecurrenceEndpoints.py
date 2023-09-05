@@ -37,7 +37,8 @@ def create_recurrence(authentication: Authentication, recurrence: Recurrence):
 
 
 @router.get("/api/calendar/recurrences/{recurrence_id}")
-def get_recurrence(authentication: Authentication, recurrence_id: int):
+def get_recurrence(auth_user: int, api_key: str, recurrence_id: int):
+    authentication = Authentication(auth_user, api_key)
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
     cursor.execute("SELECT * FROM recurrences WHERE recurrence_id = %s", (recurrence_id,))
@@ -55,7 +56,7 @@ def update_recurrence(authentication: Authentication, recurrence_id: int, update
                       after: Optional[str] = None,
                       inclusive: Optional[bool] = True):
     # authenticate
-    _ = get_recurrence(authentication, recurrence_id)
+    _ = get_recurrence(authentication.user_id, authentication.api_key, recurrence_id)
     updated_recurrence.recurrenceId = recurrence_id
     if after is None:
         after = updated_recurrence.startDate
@@ -121,7 +122,7 @@ def set_recurrence_end(authentication: Authentication, recurrence_id: int, end: 
 
 @router.delete("/api/calendar/recurrences/{recurrence_id}")
 def delete_recurrence(authentication: Authentication, recurrence_id: int):
-    get_recurrence(authentication, recurrence_id)  # authentication
+    get_recurrence(authentication.user_id, authentication.api_key, recurrence_id)  # authentication
     cursor.execute("DELETE FROM events WHERE recurrence_id = %s", (recurrence_id,))
     cursor.execute("DELETE FROM todos WHERE recurrence_id = %s", (recurrence_id,))
     cursor.execute("DELETE FROM goals WHERE recurrence_id = %s", (recurrence_id,))
@@ -133,7 +134,7 @@ def delete_recurrence(authentication: Authentication, recurrence_id: int):
 @router.delete("/api/calendar/recurrences/{recurrence_id}/after/{after}")
 def delete_recurrence_instances_after_date(authentication: Authentication, recurrence_id, after: str,
                                            inclusive: bool):
-    get_recurrence(authentication, recurrence_id)  # authenticate
+    get_recurrence(authentication.user_id, authentication.api_key, recurrence_id)  # authenticate
     if not validate_date(after):
         raise HTTPException(detail="invalid after date parameter format", status_code=400)
     greater_than_inclusive = ">=" if inclusive else ">"
@@ -301,7 +302,7 @@ def __validate_recurrence(authentication: Authentication, recurrence: Recurrence
         if recurrence.goalDesireId is None:
             raise HTTPException(detail="goal must define a desire to be linked with", status_code=400)
         # authenticate desire id
-        GoalAchievingEndpoints.get_desire(authentication, recurrence.goalDesireId)
+        GoalAchievingEndpoints.get_desire(authentication.user_id, authentication. api_key, recurrence.goalDesireId)
         if recurrence.goalHowMuch is None:
             raise HTTPException(detail="goal must define a quantity to achieve", status_code=400)
         if recurrence.goalHowMuch <= 0:

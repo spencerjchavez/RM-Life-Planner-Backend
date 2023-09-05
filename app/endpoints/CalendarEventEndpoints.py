@@ -32,7 +32,8 @@ def create_calendar_event(authentication: Authentication, event: CalendarEvent):
 
 
 @router.get("/api/calendar/events/by-event-id/{event_id}")
-def get_calendar_event(authentication: Authentication, event_id: int):
+def get_calendar_event(auth_user: int, api_key: str, event_id: int):
+    authentication = Authentication(auth_user, api_key)
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
     cursor.execute("SELECT * FROM events WHERE event_id = %s", (event_id,))
@@ -45,7 +46,8 @@ def get_calendar_event(authentication: Authentication, event_id: int):
 
 
 @router.get("/api/calendar/events/in-date-list")
-def get_calendar_events_by_date_list(authentication: Authentication, dates: list[str]):
+def get_calendar_events_by_date_list(auth_user: int, api_key: str, dates: list[str]):
+    authentication = Authentication(auth_user, api_key)
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
     if len(dates) == 0:
@@ -71,9 +73,11 @@ def get_calendar_events_by_date_list(authentication: Authentication, dates: list
 
 
 @router.get("/api/calendar/events/in-date-range")
-def get_calendar_events_by_date_range(authentication: Authentication, start_date: str,
+def get_calendar_events_by_date_range(auth_user: int, api_key: str, start_date: str,
                                       end_date: Optional[str] = None):
-    # authenticates in later call to get_calendar_events(Authentication, list[float])
+    authentication = Authentication(auth_user, api_key)
+    if not UserEndpoints.authenticate(authentication):
+        raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
     if end_date is None:
         end_date = start_date
     if not validate_date(start_date) or not validate_date(end_date):
@@ -122,7 +126,7 @@ def get_calendar_events_by_goal_ids(authentication: Authentication, goal_ids: li
 
 @router.put("/api/calendar/events/{event_id}")
 def update_calendar_event(authentication: Authentication, event_id: int, updated_event: CalendarEvent):
-    original_event = get_calendar_event(authentication, event_id)["event"]
+    original_event = get_calendar_event(authentication.user_id, authentication.api_key, event_id)["event"]
     updated_event.eventId = event_id
     __validate_event(authentication, updated_event)
     cursor.execute(f"UPDATE events SET {NAME} = %s, {DESCRIPTION} = %s, {IS_HIDDEN} = %s, {START_DATE} = %s, {START_TIME} = %s, {END_DATE} = %s, {END_TIME} = %s, {LINKED_TODO_ID} = %s, {HOW_MUCH_ACCOMPLISHED} = %s, {NOTES} = %s WHERE event_id = %s",
@@ -143,7 +147,7 @@ def update_calendar_event(authentication: Authentication, event_id: int, updated
 
 @router.delete("/api/calendar/events/{event_id}")
 def delete_event(authentication: Authentication, event_id: int):
-    get_calendar_event(authentication, event_id)  # authenticate
+    get_calendar_event(authentication.user_id, authentication.api_key, event_id)  # authenticate
     cursor.execute("DELETE FROM events WHERE event_id = %s", (event_id,))
     
     return f"successfully deleted event with id: '{event_id}'"
@@ -210,7 +214,7 @@ def __validate_event(authentication: Authentication, event: CalendarEvent):
     if event.howMuchAccomplished is not None and event.linkedTodoId is None:
         raise HTTPException(detail="event must define a linkedTodoId in order to define the how much accomplished property", status_code=400)
     if event.linkedTodoId is not None:
-        todo = CalendarToDoEndpoints.get_todo(authentication, event.linkedTodoId)["todo"]
+        todo = CalendarToDoEndpoints.get_todo(authentication.user_id, authentication.api_key, event.linkedTodoId)["todo"]
         if todo.linkedGoalId != event.linkedGoalId:
             raise HTTPException(
                 detail="event must define a linked goal id that matches its todo's linked goal id",
@@ -231,4 +235,4 @@ def __validate_event(authentication: Authentication, event: CalendarEvent):
                             status_code=400)
     # check authentication on recurrenceId
     if event.recurrenceId is not None:
-        RecurrenceEndpoints.get_recurrence(authentication, event.recurrenceId)
+        RecurrenceEndpoints.get_recurrence(authentication.user_id, authentication.api_key, event.recurrenceId)
