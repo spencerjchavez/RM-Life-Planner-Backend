@@ -84,15 +84,7 @@ def login_user(username: str, password: str):
     if res is None:
         raise HTTPException(status_code=404, detail="username or password is incorrect")
     password = password.encode("utf-8")
-<<<<<<< HEAD
-    salt = res["salt"]
-    hashed_password = bcrypt.hashpw(password, salt)
-    print("db_pw: " + res["hashed_password"].decode("utf-8"))
-    print("pw: " + hashed_password.decode("utf-8"))
-    if res["hashed_password"] == hashed_password:
-=======
     if bcrypt.checkpw(password, res["hashed_password"]):
->>>>>>> 051ff938d4ee7fcd6f9aab14e2151c332c2ff40c
         #successfully logged in!
         return {"authentication": gen_api_key(res["user_id"])}
     raise HTTPException(status_code=401, detail="username or password is incorrect")
