@@ -144,8 +144,8 @@ def update_user(authentication: Authentication, user_id: int, updated_user: User
 
 
 @router.delete("/api/users/{user_id}")
-def delete_user(authentication: Authentication, user_id: int):
-    user_id = authentication.user_id
+def delete_user(auth_user: int, api_key: str, user_id: int):
+    user_id = auth_user
     if not authenticate(authentication):
         raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
     cursor.execute("DELETE FROM alerts WHERE user_id = %s", (user_id,))
