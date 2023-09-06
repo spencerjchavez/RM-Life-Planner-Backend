@@ -146,15 +146,16 @@ def update_calendar_event(authentication: Authentication, event_id: int, updated
     return {"message": "success"}
 
 @router.delete("/api/calendar/events/{event_id}")
-def delete_event(authentication: Authentication, event_id: int):
-    get_calendar_event(authentication.user_id, authentication.api_key, event_id)  # authenticate
+def delete_event(auth_user: int, api_key: str, event_id: int):
+    get_calendar_event(auth_user, api_key, event_id)  # authenticate
     cursor.execute("DELETE FROM events WHERE event_id = %s", (event_id,))
     
     return f"successfully deleted event with id: '{event_id}'"
 
 
 @router.delete("/api/calendar/events")
-def delete_events_of_user(authentication: Authentication):
+def delete_events_of_user(auth_user: int, api_key: str):
+    authentication = Authentication(auth_user, api_key)
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
     cursor.execute("DELETE FROM events WHERE user_id = %s", (authentication.user_id,))
