@@ -199,15 +199,15 @@ def update_calendar_todo(authentication: Authentication, todo_id: int, updated_t
 
 
 @router.delete("/api/calendar/todos/{todo_id}")
-def delete_todo(authentication: Authentication, todo_id: int):
-    get_todo(authentication.user_id, authentication.api_key, todo_id)  # authenticate
+def delete_todo(auth_user: int, api_key: str, todo_id: int):
+    get_todo(auth_user, api_key, todo_id)  # authenticate
     cursor.execute("DELETE FROM todos WHERE todo_id = %s", (todo_id,))
-    
     return f"successfully deleted todo with id: '{todo_id}'"
 
 
 @router.delete("/api/calendar/todos")
-def delete_todos_of_user(authentication: Authentication):
+def delete_todos_of_user(auth_user: int, api_key: str):
+    authentication = Authentication(auth_user, api_key)
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
     cursor.execute("DELETE FROM todos WHERE user_id = %s", (authentication.user_id,))
