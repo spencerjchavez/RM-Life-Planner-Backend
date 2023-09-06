@@ -248,10 +248,9 @@ def update_goal(authentication: Authentication, goal_id: int, updated_goal: Goal
 
 
 @router.delete("/api/goals/{goal_id}")
-def delete_goal(authentication: Authentication, goal_id: int):
-    get_goal(authentication.user_id, authentication.api_key, goal_id)
+def delete_goal(auth_user: int, api_key: str, goal_id: int):
+    get_goal(auth_user, api_key, goal_id)
     cursor.execute("DELETE FROM goals WHERE goal_id = %s", (goal_id,))
-    
     return {"message": f"Goal with ID {goal_id} deleted successfully"}
 
 
