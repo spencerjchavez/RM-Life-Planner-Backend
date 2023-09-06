@@ -132,9 +132,9 @@ def delete_recurrence(authentication: Authentication, recurrence_id: int):
 
 
 @router.delete("/api/calendar/recurrences/{recurrence_id}/after/{after}")
-def delete_recurrence_instances_after_date(authentication: Authentication, recurrence_id, after: str,
+def delete_recurrence_instances_after_date(auth_user: int, api_key: str, recurrence_id, after: str,
                                            inclusive: bool):
-    get_recurrence(authentication.user_id, authentication.api_key, recurrence_id)  # authenticate
+    get_recurrence(auth_user, api_key, recurrence_id)  # authenticate
     if not validate_date(after):
         raise HTTPException(detail="invalid after date parameter format", status_code=400)
     greater_than_inclusive = ">=" if inclusive else ">"
