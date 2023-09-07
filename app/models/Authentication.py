@@ -8,9 +8,7 @@ class Authentication(BaseModel):
     api_key: str
 
     def __init__(self, user_id: int, api_key: str):
-        super().__init__()
-        self.user_id = user_id
-        self.api_key = api_key
+        super().__init__(user_id=user_id, api_key=api_key)
 
     @staticmethod
     def from_sql_res(src: dict):

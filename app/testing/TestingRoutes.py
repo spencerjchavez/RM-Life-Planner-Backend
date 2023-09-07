@@ -1,14 +1,12 @@
 from fastapi import APIRouter
 from mysql.connector.connection import MySQLCursor
 
+from app.endpoints import RecurrenceEndpoints
+
 router = APIRouter()
 cursor: MySQLCursor
 
-@router.get("/api/testing")
-def get_hello_world():
-    return {"message": "server is running!"}
 
-'''
 @router.post("/api/testing/reset_tables")
 def reset_tables():
     with open("testing/init_tables_script.sql", 'r') as file:
@@ -18,6 +16,4 @@ def reset_tables():
             pass
         _ = cursor.fetchall()
         RecurrenceEndpoints.months_accessed_cache = {}
-        print("successfully reset tables")
         return
-'''

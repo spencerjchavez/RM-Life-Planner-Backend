@@ -1,5 +1,3 @@
-use u721863814_rm_lp_db1;
-
 DROP TABLE IF EXISTS alerts;
 DROP TABLE IF EXISTS months_accessed_by_user;
 DROP TABLE IF EXISTS events;

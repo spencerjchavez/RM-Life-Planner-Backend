@@ -29,7 +29,7 @@ class UserEndpointsTest:
             return Authentication(user_id=auth_dict["user_id"], api_key=auth_dict["api_key"])
 
     def test_get_user(self, authentication: Authentication, expected_response_code: int = 200):
-        res = requests.get(self.users_url + "/" + str(authentication.user_id), json=authentication.__dict__)
+        res = requests.get(self.users_url + "/" + str(authentication.user_id), params={"auth_user": authentication.user_id, "api_key": authentication.api_key})
         compare_responses(res, expected_response_code)
         if expected_response_code == 200:
             return res.json()["user"]
@@ -46,7 +46,7 @@ class UserEndpointsTest:
         compare_responses(res, expected_response_code)
 
     def test_delete_user(self, authentication: Authentication, expected_response_code: int = 200):
-        res = requests.delete(self.users_url + "/" + str(authentication.user_id), json=authentication.__dict__)
+        res = requests.delete(self.users_url + "/" + str(authentication.user_id), params={"auth_user": authentication.user_id, "api_key": authentication.api_key})
         compare_responses(res, expected_response_code)
 
     def launch_user_test(self):

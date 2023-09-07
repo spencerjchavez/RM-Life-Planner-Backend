@@ -9,6 +9,8 @@ import requests
 from app.testing.test_scripts.calendar_item_tests.ToDoTests import ToDoTests
 from app.testing.test_scripts.goal_achieving_tests.DesiresTests import DesiresTests
 from app.testing.test_scripts.goal_achieving_tests.GoalsTests import GoalsTests
+from app.testing.test_scripts.TestingHelperFunctions import *
+from app.testing.sample_objects.Users import *
 
 
 class CalendarEventTests:
@@ -216,14 +218,14 @@ class CalendarEventTests:
 
     def test_get_event(self, event_id: int, authentication: Authentication, expected_response_code: int = 200):
         res = requests.get(self.get_event_by_event_id + "/" + str(event_id),
-                           json=authentication.__dict__)
+                           params={"auth_user": authentication.user_id, "api_key": authentication.api_key})
         compare_responses(res, expected_response_code)
         if expected_response_code == 200:
             return res.json()["event"]
 
     def test_get_events_in_range(self, start_day: str, authentication: Authentication, end_day: Optional[str] = None,
                             expected_response_code: int = 200):
-        res = requests.get(self.get_events_by_days_range_url, params={"start_date": start_day, "end_date": end_day}, json=authentication.__dict__)
+        res = requests.get(self.get_events_by_days_range_url, params={"start_date": start_day, "end_date": end_day, "auth_user": authentication.user_id, "api_key": authentication.api_key})
         compare_responses(res, expected_response_code)
         if expected_response_code == 200:
             return res.json()["events"]
@@ -243,5 +245,5 @@ class CalendarEventTests:
         compare_responses(res, expected_response_code)
 
     def test_delete_event(self, event_id: int, authentication: Authentication, expected_response_code: int = 200):
-        res = requests.delete(self.event_url + "/" + str(event_id), json=authentication.__dict__)
+        res = requests.delete(self.event_url + "/" + str(event_id), params={"auth_user": authentication.user_id, "api_key": authentication.api_key})
         compare_responses(res, expected_response_code)

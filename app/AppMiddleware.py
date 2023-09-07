@@ -17,6 +17,32 @@ TIMEOUT = 90
 class AppMiddleware(BaseHTTPMiddleware):
 
     db_connection: MySQLConnection
+    host: str
+    database_name: str
+    user: str
+    password: str
+    test_mode: bool
+
+    @staticmethod
+    def init_db_credentials(test_mode: bool):
+        PRODUCTION_DB_CREDENTIALS = {
+            "host": '62.72.50.52',
+            "database_name": 'u721863814_rm_lp_db1',
+            "user": 'u721863814_server',
+            "password": '5UP3RDUP3R43cr3tP455W0RD#b3tT3rTh4nY0ulelgG@u2??::'
+        }
+        TEST_DB_CREDENTIALS = {
+            "host": '62.72.50.52',
+            "database_name": 'u721863814_rm_lb_test_db',
+            "user": 'u721863814_admin',
+            "password": 'gSIhnrQ*&2zSs7[7[ND;$C1@CVQMp>zY'
+        }
+        AppMiddleware.test_mode = test_mode
+        credentials = TEST_DB_CREDENTIALS if test_mode else PRODUCTION_DB_CREDENTIALS
+        AppMiddleware.host = credentials["host"]
+        AppMiddleware.database_name = credentials["database_name"]
+        AppMiddleware.user = credentials["user"]
+        AppMiddleware.password = credentials["password"]
 
     async def dispatch(self, request: Request, call_next):
         try:
@@ -45,14 +71,15 @@ class AppMiddleware(BaseHTTPMiddleware):
         try:
             print("initializing db connection")
             db_connection = Connect(
-                host='62.72.50.52',
-                database='u721863814_rm_lp_db1',
-                user='u721863814_server',
-                password='5UP3RDUP3R43cr3tP455W0RD#b3tT3rTh4nY0ulelgG@u2??::',
+                host=AppMiddleware.host,
+                database=AppMiddleware.database_name,
+                user=AppMiddleware.user,
+                password=AppMiddleware.password,
                 autocommit=True
             )
             AppMiddleware.db_connection = db_connection
             cursor = db_connection.cursor(dictionary=True)
+            # cursor.execute("USE %s;", ('u721863814_rm_lp_test_db' if AppMiddleware.test_mode else 'u721863814_rm_lp_db1',))
             CalendarEventEndpoints.cursor = cursor
             CalendarEventEndpoints.db = db_connection
             CalendarToDoEndpoints.cursor = cursor

@@ -127,11 +127,10 @@ def update_user(authentication: Authentication, user_id: int, updated_user: User
     res = get_user_with_login_info(user_id)
     updated_user.userId = user_id
     if updated_user.password is not None:
-        updated_user.hashedPassword = bcrypt.hashpw(updated_user.password.encode("utf-8"),
-                                                    res["salt"])
+        salt = bcrypt.gensalt()
+        updated_user.hashedPassword = bcrypt.hashpw(updated_user.password.encode("utf-8"), salt)
     else:
         updated_user.hashedPassword = res["hashed_password"]
-    updated_user.salt = res["salt"]
     updated_user.dateJoined = res["date_joined"]
     __validate_user(updated_user)
     cursor.execute("UPDATE users SET hashed_password = %s, email = %s, google_calendar_id = %s WHERE user_id = %s;",
@@ -146,7 +145,7 @@ def update_user(authentication: Authentication, user_id: int, updated_user: User
 @router.delete("/api/users/{user_id}")
 def delete_user(auth_user: int, api_key: str, user_id: int):
     user_id = auth_user
-    if not authenticate(authentication):
+    if not authenticate(Authentication(auth_user, api_key)):
         raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
     cursor.execute("DELETE FROM alerts WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM months_accessed_by_user WHERE user_id = %s", (user_id,))

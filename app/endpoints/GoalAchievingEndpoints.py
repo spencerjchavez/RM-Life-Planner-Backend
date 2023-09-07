@@ -72,7 +72,8 @@ def update_desire(authentication: Authentication, desire_id: int, updated_desire
 
 
 @router.delete("/api/desires/{desire_id}")
-def delete_desire(authentication: Authentication, desire_id: int):
+def delete_desire(auth_user: int, api_key: str, desire_id: int):
+    authentication = Authentication(auth_user, api_key)
     user_id = authentication.user_id
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)

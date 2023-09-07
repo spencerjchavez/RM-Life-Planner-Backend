@@ -1,11 +1,14 @@
 import requests
 
+from app.models.Authentication import Authentication
 from app.models.Desire import Desire
 from app.models.Goal import Goal
 from ..UserEndpointsTest import UserEndpointsTest
 from app.models.ToDo import ToDo
 from ..goal_achieving_tests.DesiresTests import DesiresTests
 from ..goal_achieving_tests.GoalsTests import GoalsTests
+from app.testing.sample_objects.Users import *
+from app.testing.test_scripts.TestingHelperFunctions import *
 
 
 class ToDoTests:
@@ -175,24 +178,21 @@ class ToDoTests:
             return res.json()["todo_id"]
 
     def test_get_todo(self, todo_id: int, authentication: Authentication, expected_response_code: int = 200):
-        res = requests.get(self.get_todos_by_todo_id + "/" + str(todo_id),
-                           json=authentication.__dict__)
+        res = requests.get(self.get_todos_by_todo_id + "/" + str(todo_id), params={"auth_user": authentication.user_id, "api_key": authentication.api_key})
         compare_responses(res, expected_response_code)
         if expected_response_code == 200:
             return res.json()["todo"]
 
     def test_get_todos_by_day(self, start_day: str, authentication: Authentication,
                               expected_response_code: int = 200):
-        res = requests.get(self.get_todos_by_days_range_url, params={"start_date": start_day},
-                           json=authentication.__dict__)
+        res = requests.get(self.get_todos_by_days_range_url, params={"start_date": start_day, "auth_user": authentication.user_id, "api_key": authentication.api_key})
         compare_responses(res, expected_response_code)
         if expected_response_code == 200:
             return res.json()["todos"]
 
     def test_get_todos_by_day_range(self, start_day: str, authentication: Authentication,
                                     expected_response_code: int = 200):
-        res = requests.get(self.get_todos_by_days_range_url, params={"start_date": start_day, "end_date": start_day},
-                           json=authentication.__dict__)
+        res = requests.get(self.get_todos_by_days_range_url, params={"start_date": start_day, "end_date": start_day, "auth_user": authentication.user_id, "api_key": authentication.api_key})
         compare_responses(res, expected_response_code)
         if expected_response_code == 200:
             return res.json()["todos"]
@@ -206,5 +206,5 @@ class ToDoTests:
         compare_responses(res, expected_response_code)
 
     def test_delete_todo(self, todo_id: int, authentication: Authentication, expected_response_code: int = 200):
-        res = requests.delete(self.todo_url + "/" + str(todo_id), json=authentication.__dict__)
+        res = requests.delete(self.todo_url + "/" + str(todo_id), params={"auth_user": authentication.user_id, "api_key": authentication.api_key})
         compare_responses(res, expected_response_code)

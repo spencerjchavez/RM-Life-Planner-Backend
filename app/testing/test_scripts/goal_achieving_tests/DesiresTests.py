@@ -2,6 +2,8 @@ import requests
 from app.models.Authentication import Authentication
 from app.testing.test_scripts.UserEndpointsTest import UserEndpointsTest
 from app.models.Desire import Desire
+from app.testing.test_scripts.TestingHelperFunctions import *
+from app.testing.sample_objects.Users import *
 
 
 class DesiresTests:
@@ -128,7 +130,7 @@ class DesiresTests:
 
     def test_get_desire(self, desire_id: int, authentication: Authentication, expected_response_code: int = 200):
         res = requests.get(self.desire_url + "/" + str(desire_id),
-                           json=authentication.__dict__)
+                           params={"auth_user": authentication.user_id, "api_key": authentication.api_key})
         compare_responses(res, expected_response_code)
         if expected_response_code == 200:
             return res.json()["desire"]
@@ -140,5 +142,5 @@ class DesiresTests:
         compare_responses(res, expected_response_code)
 
     def test_delete_desire(self, desire_id: int, authentication: Authentication, expected_response_code: int = 200):
-        res = requests.delete(self.desire_url + "/" + str(desire_id), json=authentication.__dict__)
+        res = requests.delete(self.desire_url + "/" + str(desire_id), params={"auth_user": authentication.user_id, "api_key": authentication.api_key})
         compare_responses(res, expected_response_code)

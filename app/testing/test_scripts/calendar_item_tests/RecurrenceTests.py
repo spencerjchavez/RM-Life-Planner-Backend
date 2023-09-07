@@ -5,7 +5,8 @@ from app.testing.test_scripts.calendar_item_tests.CalendarEventTests import Cale
 from app.testing.test_scripts.calendar_item_tests.ToDoTests import ToDoTests
 from app.testing.test_scripts.goal_achieving_tests.DesiresTests import DesiresTests
 from app.testing.test_scripts.goal_achieving_tests.GoalsTests import GoalsTests
-
+from app.testing.test_scripts.UserEndpointsTest import *
+from app.testing.test_scripts.TestingHelperFunctions import *
 from app.models.Recurrence import Recurrence
 
 
@@ -303,7 +304,7 @@ class RecurrenceTests:
     def test_get_recurrence(self, recurrence_id: int, authentication: Authentication,
                             expected_response_code: int = 200):
         res = requests.get(self.recurrence_url + "/" + str(recurrence_id),
-                           json=authentication.__dict__)
+                           params={"auth_user": authentication.user_id, "api_key": authentication.api_key})
         compare_responses(res, expected_response_code)
         if expected_response_code == 200:
             return res.json()["recurrence"]
@@ -318,5 +319,5 @@ class RecurrenceTests:
 
     def test_delete_recurrence(self, recurrence_id: int, authentication: Authentication,
                                expected_response_code: int = 200):
-        res = requests.delete(self.recurrence_url + "/" + str(recurrence_id), json=authentication.__dict__)
+        res = requests.delete(self.recurrence_url + "/" + str(recurrence_id), params={"auth_user": authentication.user_id, "api_key": authentication.api_key})
         compare_responses(res, expected_response_code)

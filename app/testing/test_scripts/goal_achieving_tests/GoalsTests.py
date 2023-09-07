@@ -6,6 +6,8 @@ from app.models.Authentication import Authentication
 from app.testing.test_scripts.goal_achieving_tests.DesiresTests import DesiresTests
 from app.testing.test_scripts.UserEndpointsTest import UserEndpointsTest
 from app.models.Desire import Desire
+from app.testing.test_scripts.TestingHelperFunctions import *
+from app.testing.sample_objects.Users import *
 
 
 class GoalsTests:
@@ -173,15 +175,14 @@ class GoalsTests:
 
     def test_get_goal(self, goal_id: int, authentication: Authentication, expected_response_code: int = 200):
         res = requests.get(self.get_goals_by_id_url + "/" + str(goal_id),
-                           json=authentication.__dict__)
+                           params={"auth_user": authentication.user_id, "api_key": authentication.api_key})
         compare_responses(res, expected_response_code)
         if expected_response_code == 200:
             return res.json()["goal"]
 
     def test_get_goals(self, start_date: Optional[str], authentication: Authentication,
                        expected_response_code: int = 200):
-        res = requests.get(self.get_goals_by_days_range, params={"start_date": start_date},
-                           json=authentication.__dict__)
+        res = requests.get(self.get_goals_by_days_range, params={"start_date": start_date, "auth_user": authentication.user_id, "api_key": authentication.api_key},)
         compare_responses(res, expected_response_code)
         if expected_response_code == 200:
             return res.json()["goals"]
@@ -193,5 +194,5 @@ class GoalsTests:
         compare_responses(res, expected_response_code)
 
     def test_delete_goal(self, goal_id: int, authentication: Authentication, expected_response_code: int = 200):
-        res = requests.delete(self.goals_url + "/" + str(goal_id), json=authentication.__dict__)
+        res = requests.delete(self.goals_url + "/" + str(goal_id), params={"auth_user": authentication.user_id, "api_key": authentication.api_key})
         compare_responses(res, expected_response_code)

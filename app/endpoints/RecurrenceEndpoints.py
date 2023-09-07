@@ -62,7 +62,7 @@ def update_recurrence(authentication: Authentication, recurrence_id: int, update
         after = updated_recurrence.startDate
     updated_recurrence.startDate = after
     __validate_recurrence(authentication, updated_recurrence)
-    delete_recurrence_instances_after_date(authentication, recurrence_id, after, inclusive)
+    delete_recurrence_instances_after_date(authentication.user_id, authentication.api_key, recurrence_id, after, inclusive)
 
     # insert new recurrence
     cursor.execute(
@@ -121,8 +121,8 @@ def set_recurrence_end(authentication: Authentication, recurrence_id: int, end: 
 
 
 @router.delete("/api/calendar/recurrences/{recurrence_id}")
-def delete_recurrence(authentication: Authentication, recurrence_id: int):
-    get_recurrence(authentication.user_id, authentication.api_key, recurrence_id)  # authentication
+def delete_recurrence(auth_user: int, api_key: str, recurrence_id: int):
+    get_recurrence(auth_user, api_key, recurrence_id)  # authentication
     cursor.execute("DELETE FROM events WHERE recurrence_id = %s", (recurrence_id,))
     cursor.execute("DELETE FROM todos WHERE recurrence_id = %s", (recurrence_id,))
     cursor.execute("DELETE FROM goals WHERE recurrence_id = %s", (recurrence_id,))

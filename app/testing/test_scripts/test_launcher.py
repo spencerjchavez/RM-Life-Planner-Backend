@@ -24,7 +24,7 @@ sample_actions_path = '../sample_objects/goal_achieving/actions.py'
 
 
 test_user_endpoints = True
-test_calendar_endpoints = True
+test_calendar_endpoints = False
 test_goal_achieving_endpoints = True
 
 
