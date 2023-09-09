@@ -47,7 +47,7 @@ def get_todo(auth_user: int, api_key: str, todo_id: int):
     return {"todo": ToDo.from_sql_res(res)}
 
 
-@router.get("/api/calendar/todos/in-date-list")
+@router.post("/api/calendar/todos/in-date-list")
 def get_todos_by_dates_list(auth_user: int, api_key: str, dates: list[str]):
     authentication = Authentication(auth_user, api_key)
     if not UserEndpoints.authenticate(authentication):
