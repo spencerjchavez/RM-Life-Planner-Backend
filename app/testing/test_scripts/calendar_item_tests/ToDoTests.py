@@ -15,9 +15,10 @@ class ToDoTests:
 
     def __init__(self, base_url: str, desire_tests: DesiresTests, goal_tests: GoalsTests):
         self.todo_url = base_url + "/calendar/todos"
-        self.get_todos_by_todo_id = self.todo_url + "/by-todo-id"
+        self.get_todos_by_todo_id_url = self.todo_url + "/by-todo-id"
         self.get_todos_by_days_list_url = self.todo_url + "/in-date-list"
         self.get_todos_by_days_range_url = self.todo_url + "/in-date-range"
+        self.get_todos_by_goal_id_url = self.todo_url + "/by-goal-id"
         self.base_url = base_url
         self.user_tests = UserEndpointsTest(base_url)
         self.desire_tests = desire_tests
@@ -83,6 +84,7 @@ class ToDoTests:
     def test_get_with_malformed_params(self, authentication: Authentication):
         self.test_get_todos_by_day_range(self.bad_date, authentication, 400)
         self.test_get_todo(-1, authentication, 404)
+        self.test_get_todos_by_goal_id(-1, authentication, 404)
 
     def test_update_with_malformed_todos(self, authentication: Authentication, goal_id: int):
         # setup
@@ -159,6 +161,9 @@ class ToDoTests:
 
         todo_received = self.test_get_todo(todo.todoId, authentication)
         assert updated_todo.name == todo_received["name"]
+        todos_received = self.test_get_todos_by_goal_id(goal_id, authentication)
+        assert len(todos_received) == 1
+        assert updated_todo.name == todos_received[0]["name"]
 
         todos_received = self.test_get_todos_by_day(self.start_date1, authentication)
         assert len(todos_received) == 1
@@ -178,7 +183,7 @@ class ToDoTests:
             return res.json()["todo_id"]
 
     def test_get_todo(self, todo_id: int, authentication: Authentication, expected_response_code: int = 200):
-        res = requests.get(self.get_todos_by_todo_id + "/" + str(todo_id), params={"auth_user": authentication.user_id, "api_key": authentication.api_key})
+        res = requests.get(self.get_todos_by_todo_id_url + "/" + str(todo_id), params={"auth_user": authentication.user_id, "api_key": authentication.api_key})
         compare_responses(res, expected_response_code)
         if expected_response_code == 200:
             return res.json()["todo"]
@@ -193,6 +198,18 @@ class ToDoTests:
     def test_get_todos_by_day_range(self, start_day: str, authentication: Authentication,
                                     expected_response_code: int = 200):
         res = requests.get(self.get_todos_by_days_range_url, params={"start_date": start_day, "end_date": start_day, "auth_user": authentication.user_id, "api_key": authentication.api_key})
+        compare_responses(res, expected_response_code)
+        if expected_response_code == 200:
+            return res.json()["todos"]
+
+    def test_get_todos_by_goal_id(self, goal_id: int, authentication: Authentication, expected_response_code: int = 200):
+        res = requests.get(self.get_todos_by_goal_id_url + "/" + str(goal_id), params={"auth_user": authentication.user_id, "api_key": authentication.api_key})
+        compare_responses(res, expected_response_code)
+        if expected_response_code == 200:
+            return res.json()["todos"]
+
+    def test_get_todos_by_goal_ids(self, goal_ids: list[int], authentication: Authentication, expected_response_code: int = 200):
+        res = requests.post(self.get_todos_by_goal_id_url, params={"auth_user": authentication.user_id, "api_key": authentication.api_key}, json=goal_ids)
         compare_responses(res, expected_response_code)
         if expected_response_code == 200:
             return res.json()["todos"]

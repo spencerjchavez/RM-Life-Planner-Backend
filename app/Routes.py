@@ -21,4 +21,3 @@ app.include_router(RecurrenceEndpoints.router)
 app.include_router(GoalAchievingEndpoints.router)
 if TEST_MODE:
     app.include_router(TestingRoutes.router)
-

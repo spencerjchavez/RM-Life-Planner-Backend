@@ -64,21 +64,23 @@ class GoalsTests:
         goal_retrieved = self.test_get_goal(goal_id, authentication)
         assert goal_retrieved["name"] == updated_goal.name
         # test get goals by day
-        goals_retrieved = self.test_get_goals(self.start_time, authentication)
+        goals_retrieved = self.test_get_goals(self.start_time, None, authentication)
         assert len(goals_retrieved) == 1
         assert goals_retrieved[0]["name"] == updated_goal.name
-        goals_retrieved = self.test_get_goals(self.start_time2, authentication)
+        goals_retrieved = self.test_get_goals(self.start_time2, None, authentication)
+        assert len(goals_retrieved) == 1
+        goals_retrieved = self.test_get_goals(self.start_time2, desire_id, authentication)
         assert len(goals_retrieved) == 1
         # updated startInstant and check again
         updated_goal.startDate = self.start_time2
         self.test_update_goal(goal_id, updated_goal, authentication)
-        goals = self.test_get_goals(self.start_time, authentication)
+        goals = self.test_get_goals(self.start_time, None, authentication)
         assert len(goals) == 0
-        goals = self.test_get_goals(self.start_time2, authentication)
+        goals = self.test_get_goals(self.start_time2, None, authentication)
         assert len(goals) == 1
         self.test_delete_goal(goal_id, authentication)
         # assert that delete worked
-        goals_retrieved = self.test_get_goals(self.start_time2, authentication)
+        goals_retrieved = self.test_get_goals(self.start_time2, None, authentication)
         assert len(goals_retrieved) == 0
 
     def test_malformed_inputs(self, authentication: Authentication, another_authentication: Authentication,
@@ -145,7 +147,8 @@ class GoalsTests:
 
     def test_get_with_malformed_params(self, authentication: Authentication, desire_id: int):
         self.test_get_goal(-1, authentication, 404)
-        self.test_get_goals(self.bad_date, authentication, 400)
+        self.test_get_goals(self.bad_date, None, authentication, 400)
+        self.test_get_goals(self.start_time, -1, authentication, 404)
 
     def test_call_functions_without_authentication(self, authentication: Authentication,
                                                    another_authentication: Authentication, desire_id: int):
@@ -180,9 +183,9 @@ class GoalsTests:
         if expected_response_code == 200:
             return res.json()["goal"]
 
-    def test_get_goals(self, start_date: Optional[str], authentication: Authentication,
+    def test_get_goals(self, start_date: Optional[str], desire_id: Optional[int], authentication: Authentication,
                        expected_response_code: int = 200):
-        res = requests.get(self.get_goals_by_days_range, params={"start_date": start_date, "auth_user": authentication.user_id, "api_key": authentication.api_key},)
+        res = requests.get(self.get_goals_by_days_range, params={"start_date": start_date, "desire_id": desire_id, "auth_user": authentication.user_id, "api_key": authentication.api_key},)
         compare_responses(res, expected_response_code)
         if expected_response_code == 200:
             return res.json()["goals"]

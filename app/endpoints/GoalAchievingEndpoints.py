@@ -63,12 +63,10 @@ def update_desire(authentication: Authentication, desire_id: int, updated_desire
     get_desire(authentication.user_id, authentication.api_key, desire_id)
     updated_desire.desireId = desire_id
     __validate_desire(authentication, updated_desire)
-    query = f"UPDATE desires SET {NAME} = %s, {DEADLINE} = %s, {DATE_RETIRED} = %s, {PRIORITY_LEVEL} = %s,  {COLOR_R} = %s, {COLOR_G} = %s, {COLOR_B} = %s WHERE desire_id = %s"
-    params = (updated_desire.name, updated_desire.deadline, updated_desire.dateRetired, updated_desire.priorityLevel,
-              updated_desire.colorR, updated_desire.colorG, updated_desire.colorB, desire_id)
+    query = f"UPDATE desires SET {NAME} = %s, {DEADLINE} = %s, {DATE_RETIRED} = %s, {PRIORITY_LEVEL} = %s WHERE desire_id = %s"
+    params = (updated_desire.name, updated_desire.deadline, updated_desire.dateRetired, updated_desire.priorityLevel, desire_id)
     cursor.execute(query, params)
-    
-    return f"Desire with ID {desire_id} updated successfully"
+    return {"message": f"Desire with ID {desire_id} updated successfully"}
 
 
 @router.delete("/api/desires/{desire_id}")
@@ -102,15 +100,16 @@ def __validate_desire(authentication: Authentication, desire: Desire):
         raise HTTPException(detail="desire name must not exceed 42 characters", status_code=400)
     if desire.dateCreated is None:
         raise HTTPException(detail="desire missing a creation date", status_code=400)
-    if desire.colorR is None or desire.colorG is None or desire.colorB is None:
+    """if desire.colorR is None or desire.colorG is None or desire.colorB is None:
         raise HTTPException(detail="desire missing color", status_code=400)
     if desire.colorR < 0 or desire.colorR > 1 \
             or desire.colorB < 0 or desire.colorB > 1 \
             or desire.colorG < 0 or desire.colorG > 1:
-        raise HTTPException(detail="desire does not define a valid color", status_code=400)
-    if desire.priorityLevel is not None:
-        if desire.priorityLevel < 0:
-            raise HTTPException(detail="desire priority level must be 0 or greater", status_code=400)
+        raise HTTPException(detail="desire does not define a valid color", status_code=400)"""
+    if desire.priorityLevel is None:
+        raise HTTPException(detail="desire must indicate a priority level", status_code=400)
+    if desire.priorityLevel <= 0 or desire.priorityLevel > 5:
+        raise HTTPException(detail="desire priority level must be in range 1 - 5", status_code=400)
 
 
 #
@@ -148,8 +147,30 @@ def get_goal(auth_user: int, api_key: str, goal_id: int):
     return {"goal": Goal.from_sql_res(res)}
 
 
+@router.post("/api/goals/by-goal-id")
+def get_goals(auth_user: int, api_key: str, goal_ids: list[int]):
+    if not UserEndpoints.authenticate(Authentication(auth_user, api_key)):
+        raise HTTPException(status_code=401, detail="User not authenticated, please log in")
+    in_clause = "("
+    in_params = ()
+    for goal_id in goal_ids:
+        in_clause += "%s,"
+        in_params += (goal_id,)
+    in_clause = in_clause[:len(in_clause)-1] + ")"
+    cursor.execute("SELECT * FROM goals WHERE goal_id IN " + in_clause, in_params)
+    to_return = []
+    res = cursor.fetchall()
+    for row in res:
+        if row["user_id"] != auth_user:
+            raise HTTPException(status_code=401, detail="User not authorized to access this resource")
+        to_return.append(Goal.from_sql_res(row))
+    return {"goals": to_return}
+
+
 @router.get("/api/goals/in-date-range")
-def get_goals_in_date_range(auth_user: int, api_key: str, start_date: str, end_date: Optional[str] = None):
+def get_goals_in_date_range(auth_user: int, api_key: str, start_date: str, end_date: Optional[str] = None, desire_id: Optional[int] = None):
+    if desire_id is not None:
+        _ = get_desire(auth_user, api_key, desire_id)
     authentication = Authentication(auth_user, api_key)
     if end_date is None:
         end_date = start_date
@@ -168,10 +189,16 @@ def get_goals_in_date_range(auth_user: int, api_key: str, start_date: str, end_d
         # register what months we are accessing to generate recurrence events
         RecurrenceEndpoints.register_month_accessed_by_user(authentication, year, month)
 
-    cursor.execute("SELECT * FROM goals WHERE user_id = %s AND deadline_date >= %s AND start_date <= %s"
-                   "UNION "
-                   "SELECT * FROM goals WHERE user_id = %s AND start_date <= %s AND deadline_date IS NULL",
-                   (authentication.user_id, start_date, end_date, authentication.user_id, end_date))
+    if desire_id is None:
+        cursor.execute("SELECT * FROM goals WHERE user_id = %s AND deadline_date >= %s AND start_date <= %s"
+                       "UNION "
+                       "SELECT * FROM goals WHERE user_id = %s AND start_date <= %s AND deadline_date IS NULL",
+                       (authentication.user_id, start_date, end_date, authentication.user_id, end_date))
+    else:
+        cursor.execute("SELECT * FROM goals WHERE user_id = %s AND desire_id = %s AND deadline_date >= %s AND start_date <= %s"
+                       "UNION "
+                       "SELECT * FROM goals WHERE user_id = %s AND desire_id = %s AND start_date <= %s AND deadline_date IS NULL",
+                       (authentication.user_id, desire_id, start_date, end_date, authentication.user_id, desire_id, end_date))
     goals = []
     res = cursor.fetchall()
     for row in res:
@@ -179,8 +206,9 @@ def get_goals_in_date_range(auth_user: int, api_key: str, start_date: str, end_d
     return {"goals": goals}
 
 
-@router.get("/api/goals/in-date-list")
-def get_goals_in_date_list(auth_user: int, api_key: str, dates: list[str]):
+@router.post("/api/goals/in-date-list")
+def get_goals_in_date_list(auth_user: int, api_key: str, dates: list[str], desire_id: Optional[int] = None):
+    _ = get_desire(auth_user, api_key, desire_id)
     authentication = Authentication(auth_user, api_key)
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
@@ -197,10 +225,16 @@ def get_goals_in_date_list(auth_user: int, api_key: str, dates: list[str]):
 
     goals_by_day = {}
     for date_str in dates:
-        cursor.execute("SELECT * FROM goals WHERE user_id = %s AND deadline_date >= %s AND start_date <= %s"
-                       "UNION "
-                       "SELECT * FROM goals WHERE user_id = %s AND start_date <= %s AND deadline_date IS NULL",
-                       (Authentication.user_id, date_str, date_str, authentication.user_id, date_str))
+        if desire_id is None:
+            cursor.execute("SELECT * FROM goals WHERE user_id = %s AND deadline_date >= %s AND start_date <= %s"
+                           "UNION "
+                           "SELECT * FROM goals WHERE user_id = %s AND start_date <= %s AND deadline_date IS NULL",
+                           (Authentication.user_id, date_str, date_str, authentication.user_id, date_str))
+        else:
+            cursor.execute("SELECT * FROM goals WHERE user_id = %s AND desire_id = %s AND deadline_date >= %s AND start_date <= %s"
+                           "UNION "
+                           "SELECT * FROM goals WHERE user_id = %s AND desire_id = %s AND start_date <= %s AND deadline_date IS NULL",
+                           (Authentication.user_id, desire_id, date_str, date_str, authentication.user_id, desire_id, date_str))
         goals_by_day[date_str] = []
         res = cursor.fetchall()
         for row in res:

@@ -20,6 +20,7 @@ class CalendarEventTests:
         self.get_event_by_event_id = self.event_url + "/by-event-id"
         self.get_events_by_days_list_url = self.event_url + "/in-date-list"
         self.get_events_by_days_range_url = self.event_url + "/in-date-range"
+        self.get_events_by_goal_ids_url = self.event_url + "/by-goal-id"
         self.base_url = base_url
         self.user_tests = user_tests
         self.desire_tests = desire_tests
@@ -197,8 +198,11 @@ class CalendarEventTests:
         goal_dict = self.goal_tests.test_get_goal(event.linkedGoalId, authentication)
         assert goal_dict["deadlineDate"] == event.endDate
         # test get by day
-
         events_received = self.test_get_events_in_range(self.start_date1, authentication, self.start_date2)
+        assert len(events_received) == 1
+        assert events_received[0]["name"] == updated_event.name
+        # test get by goal_ids
+        events_received = self.test_get_events_by_goal_ids([goal_id], authentication)[str(goal_id)]
         assert len(events_received) == 1
         assert events_received[0]["name"] == updated_event.name
         # delete events
@@ -223,6 +227,14 @@ class CalendarEventTests:
         if expected_response_code == 200:
             return res.json()["event"]
 
+    def test_get_events_by_goal_ids(self, goal_ids: list[int], authentication: Authentication, expected_response_code: int = 200):
+        res = requests.post(self.get_events_by_goal_ids_url,
+                            params={"auth_user": authentication.user_id, "api_key": authentication.api_key},
+                            json=goal_ids)
+        compare_responses(res, expected_response_code)
+        if expected_response_code == 200:
+            return res.json()["events"]
+
     def test_get_events_in_range(self, start_day: str, authentication: Authentication, end_day: Optional[str] = None,
                             expected_response_code: int = 200):
         res = requests.get(self.get_events_by_days_range_url, params={"start_date": start_day, "end_date": end_day, "auth_user": authentication.user_id, "api_key": authentication.api_key})
@@ -230,13 +242,6 @@ class CalendarEventTests:
         if expected_response_code == 200:
             return res.json()["events"]
 
-    '''
-    def test_get_events(self, start_day: float, end_day: float, authentication: Authentication,
-                            expected_response_code: int = 200):
-        res = requests.get(self.event_url, params={"start_day": start_day, 'end_day': end_day}, json=authentication.__dict__)
-        compare_responses(res, expected_response_code)
-        return res.json()["events"]
-    '''
     def test_update_event(self, event_id: int, updated_event: CalendarEvent, authentication: Authentication,
                           expected_response_code: int = 200):
         updated_event.userId = authentication.user_id

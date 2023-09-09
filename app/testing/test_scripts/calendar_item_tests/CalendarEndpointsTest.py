@@ -25,6 +25,6 @@ class CalendarEndpointsTest:
         # self.alert_tests = AlertTests(self.alerts_url)
 
     def launch_test(self):
+        self.recurrence_tests.launch_test()
         self.calendar_event_tests.launch_test()
         self.todo_tests.launch_test()
-        self.recurrence_tests.launch_test()

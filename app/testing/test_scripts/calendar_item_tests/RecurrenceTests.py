@@ -128,13 +128,13 @@ class RecurrenceTests:
         recurrence_id = self.test_create_recurrence(recurrence, authentication)
 
         # test
-        goal = self.goal_tests.test_get_goals(self.start_date_1, authentication)[0]
+        goal = self.goal_tests.test_get_goals(self.start_date_1, desire_id, authentication)[0]
         assert goal["name"] == recurrence.goalName
         # update recurrence and assert change with get
         updated_recurrence = recurrence.copy()
         updated_recurrence.goalName = "updated event recurrence"
         self.test_update_recurrence(recurrence_id, updated_recurrence, authentication)
-        goal = self.goal_tests.test_get_goals(self.start_date_1, authentication)[0]
+        goal = self.goal_tests.test_get_goals(self.start_date_1, desire_id, authentication)[0]
         assert goal["name"] == updated_recurrence.goalName
         # clean up
         self.test_delete_recurrence(recurrence_id, authentication)

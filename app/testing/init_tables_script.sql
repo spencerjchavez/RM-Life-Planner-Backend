@@ -5,7 +5,10 @@ DROP TABLE IF EXISTS todos;
 DROP TABLE IF EXISTS goals;
 DROP TABLE IF EXISTS recurrences;
 DROP TABLE IF EXISTS desires;
+DROP TABLE IF EXISTS user_preferences;
 DROP TABLE IF EXISTS users;
+
+
 
 create table users (
     user_id int unsigned primary key auto_increment,
@@ -16,6 +19,18 @@ create table users (
     google_calendar_id varchar(84)
 );
 CREATE UNIQUE INDEX username_index ON users(username);
+
+CREATE TABLE user_preferences (
+    user_id INT UNSIGNED PRIMARY KEY,
+
+    highest_priority_color varchar(8) not null,
+    very_high_priority_color varchar(8) not null,
+    high_priority_color varchar(8) not null,
+    medium_priority_color varchar(8) not null,
+    low_priority_color varchar(8) not null,
+
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
 
 create table months_accessed_by_user(
     user_id int unsigned not null,
@@ -35,9 +50,6 @@ create table desires(
     deadline DATE,
     date_retired DATE,
     priority_level int,
-    color_r float unsigned not null,
-    color_g float unsigned not null,
-    color_b float unsigned not null,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 CREATE INDEX user_id_index ON desires(user_id);
@@ -140,6 +152,7 @@ create table events(
     FOREIGN KEY (recurrence_id) REFERENCES recurrences(recurrence_id)
 );
 CREATE INDEX todo_id_index ON events (linked_todo_id);
+CREATE INDEX goal_id_index ON events (linked_goal_id);
 CREATE INDEX recurrence_id_and_date_index ON events(recurrence_id, recurrence_date);
 CREATE INDEX start_date_index ON events(start_date);
 CREATE INDEX end_date_index ON events(end_date);

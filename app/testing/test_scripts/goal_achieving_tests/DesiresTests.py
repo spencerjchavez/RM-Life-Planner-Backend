@@ -30,10 +30,7 @@ class DesiresTests:
             name="my desire",
             userId=authentication.user_id,
             dateCreated="2000-08-15",
-            priorityLevel=1,
-            colorR=0,
-            colorG=0,
-            colorB=0
+            priorityLevel=1
         )
         updated_desire = desire.copy()
         updated_desire.name = "my updated desire"
@@ -57,19 +54,19 @@ class DesiresTests:
     def test_create_malformed_desires(self, authentication: Authentication):
         bad_desire = Desire(
             name="my desire",
-            userId=authentication.user_id,
+            userId=-1,
             dateCreated="2000-08-15",
-            priorityLevel=1,
-            colorR=0,
-            colorG=0
+            priorityLevel=1
         )
-        self.test_create_desire(bad_desire, authentication, 400)  # missing colorB
-        bad_desire.colorB = 0
-        bad_desire.userId = -1
         self.test_create_desire(bad_desire, authentication, 401)  # missing correct userId
         bad_desire.userId = authentication.user_id
         bad_desire.name = None
         self.test_create_desire(bad_desire, authentication, 400)  # missing name
+        bad_desire.name = "desire"
+        bad_desire.priorityLevel = 6
+        self.test_create_desire(bad_desire, authentication, 400)  # bad priority level
+        bad_desire.priorityLevel = None
+        self.test_create_desire(bad_desire, authentication, 400)  # bad priority level
 
     def test_update_with_malformed_desires(self, authentication: Authentication):
         # setup
@@ -77,23 +74,18 @@ class DesiresTests:
             name="my desire",
             userId=authentication.user_id,
             dateCreated="2010-08-15",
-            priorityLevel=1,
-            colorR=0,
-            colorG=0,
-            colorB=0
+            priorityLevel=1
         )
         good_desire_id = self.test_create_desire(good_desire, authentication)
         bad_desire = good_desire.copy()
-        bad_desire.colorB = None
-        # test
-        self.test_update_desire(good_desire_id, bad_desire, authentication, 400)  # missing colorB
-        bad_desire.colorB = 0
         bad_desire.userId = -1
         self.test_update_desire(good_desire_id, bad_desire, authentication, 401)  # missing good userId
         bad_desire.userId = authentication.user_id
         bad_desire.name = None
         self.test_update_desire(good_desire_id, bad_desire, authentication, 400)  # missing name
-
+        bad_desire.name = "desire"
+        bad_desire.priorityLevel = 0
+        self.test_update_desire(good_desire_id, bad_desire, authentication, 400)  # bad priority level
         # clean up
         self.test_delete_desire(good_desire_id, authentication)
 
@@ -106,10 +98,7 @@ class DesiresTests:
             name="my desire",
             userId=authentication.user_id,
             dateCreated="2010-08-15",
-            priorityLevel=1,
-            colorR=0,
-            colorG=0,
-            colorB=0
+            priorityLevel=1
         )
         updated_desire = desire.copy()
         updated_desire.name = "updated desire"

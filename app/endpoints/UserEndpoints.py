@@ -11,7 +11,7 @@ from mysql.connector.cursor_cext import CMySQLCursorDict
 
 from app.models.Authentication import Authentication
 from app.models.User import User
-
+from app.models.UserPreferences import UserPreferences
 
 router = APIRouter()
 cursor: CMySQLCursorDict
@@ -66,6 +66,18 @@ def register_user(user: User):
     stmt = user.get_sql_insert_query()
     params = user.get_sql_insert_params()
     cursor.execute(stmt, params)
+    _ = cursor.fetchone()
+
+    # init user preferences
+    user_preferences = UserPreferences(
+        userId=cursor.lastrowid,
+        highestPriorityColor="0xFFFFFF",
+        veryHighPriorityColor="0xFFFFFF",
+        highPriorityColor="0xFFFFFF",
+        mediumPriorityColor="0xFFFFFF",
+        lowPriorityColor="0xFFFFFF",
+    )
+    cursor.execute(user_preferences.get_sql_events_insert_query(), user_preferences.get_sql_insert_params())
     
     return login_user(user.username, password)
 
@@ -80,13 +92,18 @@ def is_username_in_use(username: str):
 def login_user(username: str, password: str):
     cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
     res = cursor.fetchone()
-    print("test")
     if res is None:
         raise HTTPException(status_code=404, detail="username or password is incorrect")
     password = password.encode("utf-8")
     if bcrypt.checkpw(password, res["hashed_password"]):
         #successfully logged in!
-        return {"authentication": gen_api_key(res["user_id"])}
+        user_id = res["user_id"]
+        cursor.execute("SELECT * FROM user_preferences WHERE user_id = %s", (user_id,))
+        res = cursor.fetchone()
+        if res is None:
+            raise HTTPException(status_code=404, detail="could not find user preferences for the given user!")
+        user_preferences = UserPreferences.from_sql_res(res)
+        return {"authentication": gen_api_key(user_id), "user_preferences": user_preferences}
     raise HTTPException(status_code=401, detail="username or password is incorrect")
 
 

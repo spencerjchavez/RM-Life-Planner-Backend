@@ -140,16 +140,18 @@ def get_todos_by_goal_id(auth_user: int, api_key: str, goal_id: int):
     return {"todos": todos}
 
 
-@router.get("/api/calendar/todos/by-goal-id/")
+@router.post("/api/calendar/todos/by-goal-id")
 def get_todos_by_goal_ids(auth_user: int, api_key: str, goal_ids: list[int]):
     authentication = Authentication(auth_user, api_key)
     if not UserEndpoints.authenticate(authentication):
         raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
     in_clause = ""
+    in_params = ()
     for goal_id in goal_ids:
-        in_clause += "," + str(goal_id)
+        in_clause += ",%s"
+        in_params += (goal_id,)
     in_clause = "(" + in_clause[1:] + ")"
-    cursor.execute("SELECT * FROM todos WHERE linked_goal_id IN %s", (in_clause,))
+    cursor.execute("SELECT * FROM todos WHERE linked_goal_id IN " + in_clause, in_params)
     res = cursor.fetchall()
     todos_by_goal_id = {}
     for row in res:

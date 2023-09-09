@@ -10,7 +10,7 @@ from mysql.connector.cursor_cext import CMySQLCursorDict
 from app.models.CalendarEvent import CalendarEvent
 from app.models.Authentication import Authentication
 from app.extras.SQLColumnNames import *
-from app.endpoints import CalendarToDoEndpoints, RecurrenceEndpoints, UserEndpoints
+from app.endpoints import CalendarToDoEndpoints, RecurrenceEndpoints, UserEndpoints, GoalAchievingEndpoints
 
 router = APIRouter()
 cursor: CMySQLCursorDict
@@ -103,10 +103,10 @@ def get_calendar_events_by_date_range(auth_user: int, api_key: str, start_date: 
         events.append(CalendarEvent.from_sql_res(row))
     return {"events": events}
 
-'''
+
 @router.get("/api/calendar/events/by-goal-id/{goal_id}")
-def get_calendar_events_by__id(authentication: Authentication, goal_id: int):
-    GoalAchievingEndpoints.get_goal(authentication, goal_id)
+def get_calendar_events_by_goal_id(auth_user: int, api_key: str, goal_id: int):
+    GoalAchievingEndpoints.get_goal(auth_user, api_key, goal_id)
     cursor.execute("SELECT * FROM events WHERE linked_goal_id = %s", (goal_id,))
     res = cursor.fetchall()
     events = []
@@ -115,13 +115,21 @@ def get_calendar_events_by__id(authentication: Authentication, goal_id: int):
     return {"events": events}
 
 
-@router.get("/api/calendar/events/by-goal-ids")
-def get_calendar_events_by_goal_ids(authentication: Authentication, goal_ids: list[int]):
+@router.post("/api/calendar/events/by-goal-id")
+def get_calendar_events_by_goal_ids(auth_user: int, api_key: str, goal_ids: list[int]):
+    _ = GoalAchievingEndpoints.get_goals(auth_user, api_key, goal_ids)
     to_return = {}
+    in_clause = "("
+    in_params = ()
     for goal_id in goal_ids:
-        to_return[goal_id] = get_calendar_events_by_goal_id(authentication, goal_id)["events"]
+        in_clause += "%s,"
+        in_params += (goal_id,)
+    in_clause = in_clause[:len(in_clause) - 1] + ")"
+    cursor.execute("SELECT * FROM events WHERE linked_goal_id IN " + in_clause, in_params)
+    res = cursor.fetchall()
+    for row in res:
+        to_return.setdefault(row["linked_goal_id"], []).append(CalendarEvent.from_sql_res(row))
     return {"events": to_return}
-'''
 
 
 @router.put("/api/calendar/events/{event_id}")
