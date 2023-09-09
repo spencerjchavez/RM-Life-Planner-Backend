@@ -60,6 +60,7 @@ def update_recurrence(authentication: Authentication, recurrence_id: int, update
     updated_recurrence.recurrenceId = recurrence_id
     if after is None:
         after = updated_recurrence.startDate
+        inclusive = True
     updated_recurrence.startDate = after
     __validate_recurrence(authentication, updated_recurrence)
     delete_recurrence_instances_after_date(authentication.user_id, authentication.api_key, recurrence_id, after, inclusive)
