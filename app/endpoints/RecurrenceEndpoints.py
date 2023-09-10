@@ -132,7 +132,7 @@ def delete_recurrence(auth_user: int, api_key: str, recurrence_id: int):
     return "recurrence successfully deleted"
 
 
-@router.delete("/api/calendar/recurrences/{recurrence_id}/after/{after}")
+#@router.delete("/api/calendar/recurrences/{recurrence_id}/after/{after}")
 def delete_recurrence_instances_after_date(auth_user: int, api_key: str, recurrence_id, after: str,
                                            inclusive: bool):
     get_recurrence(auth_user, api_key, recurrence_id)  # authenticate
