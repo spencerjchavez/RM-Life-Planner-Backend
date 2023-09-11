@@ -157,6 +157,7 @@ def __generate_recurrence_instances_for_month(authentication: Authentication, ye
     cursor.execute("SELECT * FROM recurrences WHERE user_id = %s", (authentication.user_id,))
     res = cursor.fetchall()
     for row in res:
+        print("got recurrence to generate instances for: " + str(row))
         recurrence = Recurrence.from_sql_res(row)
         rule = rrule.rrulestr(recurrence.rruleString, dtstart=datetime.strptime(recurrence.startDate, "%Y-%m-%d"))
         start_dt = datetime(year=year, month=month, day=1, hour=0, minute=0, second=0, microsecond=0)
