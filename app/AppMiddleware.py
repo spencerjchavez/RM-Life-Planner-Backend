@@ -4,19 +4,13 @@ from urllib.request import Request
 
 import mysql.connector.errors
 from starlette.middleware.base import BaseHTTPMiddleware
-from mysql.connector import OperationalError, MySQLConnection, Connect
-
-from app.endpoints import AlertEndpoints, GoalAchievingEndpoints, CalendarToDoEndpoints, RecurrenceEndpoints, \
-    CalendarEventEndpoints, UserEndpoints
-
-from testing import TestingRoutes
+from mysql.connector import OperationalError, Connect
 
 TIMEOUT = 90
 
 
 class AppMiddleware(BaseHTTPMiddleware):
 
-    db_connection: MySQLConnection
     host: str
     database_name: str
     user: str
@@ -46,30 +40,28 @@ class AppMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         try:
-            if not AppMiddleware.db_connection.is_connected():
-                print("detected that db is not connected, reconnecting...")
-                AppMiddleware.db_connection.close()
-                AppMiddleware.init_db_connection()
-            return await self.make_call_with_timeout(request, call_next)
+            db_connection = AppMiddleware.get_db_connection()
+            return await self.make_call_with_timeout(request, call_next, **{"cursor": db_connection.cursor(dictionary=True)})
         except OperationalError as e:
             print("lost connection to MySQL database during operation, attempting to recover...")
             print(e)
-            AppMiddleware.db_connection.close()
-            AppMiddleware.init_db_connection()
-            return await self.make_call_with_timeout(request, call_next)
+            if db_connection is not None:
+                db_connection.close()
+            db_connection = AppMiddleware.get_db_connection()
+            return await self.make_call_with_timeout(request, call_next, **{"cursor": db_connection.cursor(dictionary=True)})
 
-    async def make_call_with_timeout(self, request: Request, call_next):
+    async def make_call_with_timeout(self, request: Request, call_next, **kwargs):
         try:
-            return await asyncio.wait_for(call_next(request), timeout=TIMEOUT)
+            return await asyncio.wait_for(call_next(request, **kwargs), timeout=TIMEOUT)
         except TimeoutError as e:
             print("Received timeout error with the following request params!")
             print(request.__dict__)
             raise e
 
     @staticmethod
-    def init_db_connection():
+    def get_db_connection():
         try:
-            print("initializing db connection")
+            print("getting db connection")
             db_connection = Connect(
                 host=AppMiddleware.host,
                 database=AppMiddleware.database_name,
@@ -77,25 +69,9 @@ class AppMiddleware(BaseHTTPMiddleware):
                 password=AppMiddleware.password,
                 autocommit=True
             )
-            AppMiddleware.db_connection = db_connection
-            cursor = db_connection.cursor(dictionary=True)
-            # cursor.execute("USE %s;", ('u721863814_rm_lp_test_db' if AppMiddleware.test_mode else 'u721863814_rm_lp_db1',))
-            CalendarEventEndpoints.cursor = cursor
-            CalendarEventEndpoints.db = db_connection
-            CalendarToDoEndpoints.cursor = cursor
-            CalendarToDoEndpoints.db = db_connection
-            GoalAchievingEndpoints.cursor = cursor
-            GoalAchievingEndpoints.db = db_connection
-            RecurrenceEndpoints.cursor = cursor
-            RecurrenceEndpoints.db = db_connection
-            UserEndpoints.cursor = cursor
-            UserEndpoints.db = db_connection
-            AlertEndpoints.cursor = cursor
-            AlertEndpoints.db = db_connection
-            TestingRoutes.cursor = cursor
-            TestingRoutes.db = db_connection
             if db_connection.is_connected():
                 print('Connected to database')
+                return db_connection
             else:
                 raise mysql.connector.errors.ProgrammingError
         except mysql.connector.errors.ProgrammingError as e:

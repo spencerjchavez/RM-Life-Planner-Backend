@@ -6,7 +6,6 @@ import re
 
 import bcrypt
 from fastapi import APIRouter, HTTPException
-from mysql.connector import MySQLConnection
 from mysql.connector.cursor_cext import CMySQLCursorDict
 
 from app.models.Authentication import Authentication
@@ -15,8 +14,6 @@ from app.models.UserPreferences import UserPreferences
 
 router = APIRouter()
 cursor: CMySQLCursorDict
-db: MySQLConnection
-
 
 api_keys_by_userId = {}
 # assumes days are received in terms of epoch-seconds
@@ -24,7 +21,7 @@ API_TIMEOUT_SECS = 60 * 60 * 24  # keep signed in for a day
 
 
 @router.post("/api/users/register")
-def register_user(user: User):
+def register_user(user: User, cursor: CMySQLCursorDict):
     if user.username is None:
         raise HTTPException(detail="Username too short", status_code=400)
     if user.password is None:
