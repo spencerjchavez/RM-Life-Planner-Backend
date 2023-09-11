@@ -45,7 +45,7 @@ def get_calendar_event(auth_user: int, api_key: str, event_id: int):
     return {"event": CalendarEvent.from_sql_res(res)}
 
 
-@router.get("/api/calendar/events/in-date-list")
+@router.post("/api/calendar/events/in-date-list")
 def get_calendar_events_by_date_list(auth_user: int, api_key: str, dates: list[str]):
     authentication = Authentication(auth_user, api_key)
     if not UserEndpoints.authenticate(authentication):
