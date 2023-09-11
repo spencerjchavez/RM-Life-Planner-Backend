@@ -66,7 +66,7 @@ def get_calendar_events_by_date_list(auth_user: int, api_key: str, dates: list[s
 
     events_by_day = {}
     for date_str in dates:
-        cursor.execute("SELECT * FROM events WHERE user_id = %s AND start_day <= %s AND end_day >= %s", (authentication.user_id, date_str, date_str))
+        cursor.execute("SELECT * FROM events WHERE user_id = %s AND start_date <= %s AND end_date >= %s", (authentication.user_id, date_str, date_str))
         for row in cursor.fetchall():
             events_by_day.setdefault(date_str, []).append(CalendarEvent.from_sql_res(row))
     return {"events": events_by_day}
