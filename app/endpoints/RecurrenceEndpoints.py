@@ -60,6 +60,7 @@ def update_recurrence(authentication: Authentication, recurrence_id: int, update
     updated_recurrence.recurrenceId = recurrence_id
     if after is None:
         after = updated_recurrence.startDate
+        inclusive = True
     updated_recurrence.startDate = after
     __validate_recurrence(authentication, updated_recurrence)
     delete_recurrence_instances_after_date(authentication.user_id, authentication.api_key, recurrence_id, after, inclusive)
@@ -131,7 +132,7 @@ def delete_recurrence(auth_user: int, api_key: str, recurrence_id: int):
     return "recurrence successfully deleted"
 
 
-@router.delete("/api/calendar/recurrences/{recurrence_id}/after/{after}")
+#@router.delete("/api/calendar/recurrences/{recurrence_id}/after/{after}")
 def delete_recurrence_instances_after_date(auth_user: int, api_key: str, recurrence_id, after: str,
                                            inclusive: bool):
     get_recurrence(auth_user, api_key, recurrence_id)  # authenticate
@@ -156,6 +157,7 @@ def __generate_recurrence_instances_for_month(authentication: Authentication, ye
     cursor.execute("SELECT * FROM recurrences WHERE user_id = %s", (authentication.user_id,))
     res = cursor.fetchall()
     for row in res:
+        print("got recurrence to generate instances for: " + str(row))
         recurrence = Recurrence.from_sql_res(row)
         rule = rrule.rrulestr(recurrence.rruleString, dtstart=datetime.strptime(recurrence.startDate, "%Y-%m-%d"))
         start_dt = datetime(year=year, month=month, day=1, hour=0, minute=0, second=0, microsecond=0)
