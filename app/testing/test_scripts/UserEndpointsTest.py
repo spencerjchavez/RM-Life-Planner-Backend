@@ -1,6 +1,7 @@
 import requests
 from TestingHelperFunctions import *
 from app.models.Authentication import Authentication
+from app.models.LoginRequest import LoginRequest
 from app.testing.sample_objects.Users import *
 
 
@@ -21,8 +22,8 @@ class UserEndpointsTest:
             return Authentication(user_id=auth_dict["user_id"], api_key=auth_dict["api_key"])
 
     def test_login_user(self, user: User, expected_response_code: int = 200):
-        req_dict = {"username": user.username, "password": user.password}
-        res = requests.post(self.login_url, params=req_dict)
+        login_req = LoginRequest(username=user.username, password=user.password)
+        res = requests.post(self.login_url, json=login_req.dict())
         compare_responses(res, expected_response_code)
         if expected_response_code == 200:
             auth_dict = res.json()["authentication"]
