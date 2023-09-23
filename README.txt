@@ -1,3 +1,6 @@
+*** NOTE: THIS APP IS STILL UNDER PRE-RELEASE TESTING AND NOT ALL SECURITY FEATURES ARE ACTIVE.
+DO NOT USE THIS APP TO STORE YOUR PERSONAL INFORMATION UNTIL AFTER THE OFFICIAL RELEASE
+
 Welcome to the RM Life Planner Backend. Hosted by Hostinger.com, and running on a FastAPI server
 paired with a MySQL database, it provides laser-fast access to tha critical data used by the RM
 Life Planner IOS application, found at:
