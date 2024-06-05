@@ -39,9 +39,10 @@ class Recurrence(BaseModel):
     goalHowMuch: Optional[int] = None
     goalMeasuringUnits: Optional[str] = None
     goalTimeframe: Optional[Timeframe] = None
+    goalPriorityLevel: Optional[int] = None
 
     def get_sql_insert_query(self):
-        return "INSERT INTO recurrences VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
+        return "INSERT INTO recurrences VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
 
     def get_sql_insert_params(self):
         return (None,
@@ -62,7 +63,8 @@ class Recurrence(BaseModel):
                 self.goalDesireId,
                 self.goalHowMuch,
                 self.goalMeasuringUnits,
-                self.goalTimeframe)
+                self.goalTimeframe,
+                self.goalPriorityLevel)
 
     def generate_instance_objects_on_date(self, start_date: datetime):
         recurrence_start_time = datetime.strptime(self.startTime, "%H:%M:%S")
@@ -93,6 +95,7 @@ class Recurrence(BaseModel):
             goal.deadlineDate = todo_end_date.strftime("%Y-%m-%d")
             goal.recurrenceId = self.recurrenceId
             goal.recurrenceDate = start_date.strftime("%Y-%m-%d")
+            goal.priorityLevel = self.goalPriorityLevel
 
         if self.todoName is not None:
             todo = ToDo()
@@ -141,5 +144,6 @@ class Recurrence(BaseModel):
             goalDesireId=src[RECURRENCE_GOAL_DESIRE_ID],
             goalHowMuch=src[RECURRENCE_GOAL_HOW_MUCH],
             goalMeasuringUnits=src[RECURRENCE_GOAL_MEASURING_UNITS],
-            goalTimeframe=src[RECURRENCE_GOAL_TIMEFRAME]
+            goalTimeframe=src[RECURRENCE_GOAL_TIMEFRAME],
+            goalPriorityLevel=src[RECURRENCE_GOAL_PRIORITY_LEVEL]
         )

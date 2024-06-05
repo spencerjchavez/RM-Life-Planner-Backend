@@ -11,13 +11,12 @@ class Desire(BaseModel):
     dateCreated: Optional[str]
     deadline: Optional[str]
     dateRetired: Optional[str]
-    priorityLevel: Optional[int]
     #colorR: Optional[float]
     #colorG: Optional[float]
     #colorB: Optional[float]
 
     def get_sql_insert_query(self):
-        return "INSERT INTO desires VALUES (%s, %s, %s, %s, %s, %s, %s);"
+        return "INSERT INTO desires VALUES (%s, %s, %s, %s, %s, %s);"
 
     def get_sql_insert_params(self):
         return (None,
@@ -25,8 +24,7 @@ class Desire(BaseModel):
                 self.userId,
                 self.dateCreated,
                 self.deadline,
-                self.dateRetired,
-                self.priorityLevel)
+                self.dateRetired)
 
     @staticmethod
     def from_sql_res(src: dict):
@@ -42,6 +40,5 @@ class Desire(BaseModel):
             userId=src[USER_ID],
             dateCreated=src[DATE_CREATED],
             deadline=src[DEADLINE],
-            dateRetired=src[DATE_RETIRED],
-            priorityLevel=src[PRIORITY_LEVEL]
+            dateRetired=src[DATE_RETIRED]
         )

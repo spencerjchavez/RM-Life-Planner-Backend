@@ -4,7 +4,8 @@ import string
 import time
 import re
 
-import bcrypt
+import argon2
+from argon2.exceptions import VerificationError
 from fastapi import APIRouter, HTTPException
 from mysql.connector.pooling import PooledMySQLConnection, MySQLConnectionPool
 from mysql.connector.cursor_cext import CMySQLCursorDict
@@ -18,8 +19,7 @@ from app.models.UserPreferences import UserPreferences
 router = APIRouter()
 db_connection_pool: MySQLConnectionPool
 api_keys_by_userId = {}
-# assumes days are received in terms of epoch-seconds
-API_TIMEOUT_SECS = 60 * 60 * 24  # keep signed in for a day
+API_TIMEOUT_SECS = 60 * 60 * 24 * 7  # keep signed in for a week
 
 
 @router.post("/api/users/register")
@@ -58,8 +58,7 @@ def register_user(user: User):
         date_joined = datetime.datetime.now().strftime("%Y-%m-%d")
         # hash password
         password = user.password
-        salt = bcrypt.gensalt()
-        hashed_password = bcrypt.hashpw(password.encode("utf-8"), salt)
+        hashed_password = argon2.hash_password(password.encode("utf-8"))
 
         user.dateJoined = date_joined
         user.hashedPassword = hashed_password
@@ -73,14 +72,14 @@ def register_user(user: User):
         # init user preferences
         user_preferences = UserPreferences(
             userId=cursor.lastrowid,
-            highestPriorityColor="0xFFFFFF",
             veryHighPriorityColor="0xFFFFFF",
             highPriorityColor="0xFFFFFF",
             mediumPriorityColor="0xFFFFFF",
             lowPriorityColor="0xFFFFFF",
         )
         cursor.execute(user_preferences.get_sql_events_insert_query(), user_preferences.get_sql_insert_params())
-        return login_user(user.username, password)
+        req = LoginRequest(username=user.username, password=password)
+        return login_user(req)
     finally:
         conn.close()
 
@@ -104,11 +103,13 @@ def login_user(login_req: LoginRequest):
     try:
         cursor.execute("SELECT * FROM users WHERE username = %s", (login_req.username,))
         res = cursor.fetchone()
-        if res is None:
-            raise HTTPException(status_code=404, detail="username or password is incorrect")
+        hashed_password = "".encode("utf-8")
+        if res:
+            hashed_password = res["hashed_password"]
         password = login_req.password.encode("utf-8")
-        if bcrypt.checkpw(password, res["hashed_password"]):
-            #successfully logged in!
+        try:
+            argon2.verify_password(hashed_password, password)
+            # successfully logged in!
             user_id = res["user_id"]
             cursor.execute("SELECT * FROM user_preferences WHERE user_id = %s", (user_id,))
             res = cursor.fetchone()
@@ -116,7 +117,8 @@ def login_user(login_req: LoginRequest):
                 raise HTTPException(status_code=404, detail="could not find user preferences for the given user!")
             user_preferences = UserPreferences.from_sql_res(res)
             return {"authentication": gen_api_key(user_id), "user_preferences": user_preferences}
-        raise HTTPException(status_code=401, detail="username or password is incorrect")
+        except VerificationError:
+            raise HTTPException(status_code=401, detail="username or password is incorrect")
     finally:
         conn.close()
 
@@ -146,7 +148,7 @@ def get_user(auth_user: int, api_key: str, user_id: int):
             raise HTTPException(detail="specified user does not exist", status_code=404)
         if user["user_id"] != user_id or authentication.user_id != user_id:
             raise HTTPException(status_code=401, detail="User is not authenticated to access this resource")
-        return {"message": "successfully got user", "user": User.from_sql_res(user)}
+        return {"user": User.from_sql_res(user)}
     finally:
         conn.close()
 
@@ -171,8 +173,7 @@ def update_user(authentication: Authentication, user_id: int, updated_user: User
         res = get_user_with_login_info(user_id)
         updated_user.userId = user_id
         if updated_user.password is not None:
-            salt = bcrypt.gensalt()
-            updated_user.hashedPassword = bcrypt.hashpw(updated_user.password.encode("utf-8"), salt)
+            updated_user.hashedPassword = argon2.hash_password(updated_user.password.encode("utf-8"))
         else:
             updated_user.hashedPassword = res["hashed_password"]
         updated_user.dateJoined = res["date_joined"]

@@ -38,6 +38,7 @@ RECURRENCE_GOAL_DESIRE_ID = "goal_desire_id"
 RECURRENCE_GOAL_HOW_MUCH = "goal_how_much"
 RECURRENCE_GOAL_MEASURING_UNITS = "goal_measuring_units"
 RECURRENCE_GOAL_TIMEFRAME = "goal_timeframe"
+RECURRENCE_GOAL_PRIORITY_LEVEL = "goal_priority_level"
 RECURRENCE_DATE = "recurrence_date"
 
 # goals

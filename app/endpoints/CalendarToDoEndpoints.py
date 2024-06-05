@@ -28,8 +28,7 @@ def create_todo(authentication: Authentication, todo: ToDo):
             todo.get_sql_insert_query(),
             todo.get_sql_insert_params())
         todo.todoId = cursor.lastrowid
-        return {"message": "todo successfully added", "todo_id": todo.todoId}
-
+        return {"todo_id": todo.todoId}
     finally:
         conn.close()
 
@@ -76,6 +75,7 @@ def get_todos_by_dates_list(auth_user: int, api_key: str, dates: list[str]):
 
         todos_by_day = {}
         for date_str in dates:
+            # select todos that cover the given date
             cursor.execute("SELECT * FROM todos WHERE user_id = %s AND deadline_date >= %s AND start_date <= %s"
                            "UNION "
                            "SELECT * FROM todos WHERE user_id = %s "
@@ -83,11 +83,11 @@ def get_todos_by_dates_list(auth_user: int, api_key: str, dates: list[str]):
                            "AND deadline_date IS NULL "
                            "AND how_much_planned <= (SELECT SUM(how_much_accomplished) FROM events WHERE linked_todo_id = todos.todo_id)"
                            "AND (SELECT MAX(end_date) FROM events WHERE linked_todo_id = todos.todo_id) >= %s"
-                           "UNION"
+                           "UNION "
                            "SELECT * FROM todos WHERE user_id = %s "
                            "AND start_date <= %s "
                            "AND deadline_date IS NULL "
-                           "AND how_much_planned > (SELECT SUM(how_much_accomplished) FROM events WHERE linked_todo_id = todos.todo_id)",
+                           "AND how_much_planned > IFNULL((SELECT SUM(how_much_accomplished) FROM events WHERE linked_todo_id = todos.todo_id), 0)",
                            (authentication.user_id, date_str, date_str, authentication.user_id, date_str, date_str,
                             authentication.user_id, date_str))
             todos_by_day[date_str] = []
@@ -133,7 +133,7 @@ def get_todos_in_date_range(auth_user: int, api_key: str, start_date: str, end_d
                        "SELECT * FROM todos WHERE user_id = %s "
                        "AND start_date <= %s "
                        "AND deadline_date IS NULL "
-                       "AND how_much_planned > (SELECT SUM(how_much_accomplished) FROM events WHERE linked_todo_id = todos.todo_id))",
+                       "AND how_much_planned > IFNULL((SELECT SUM(how_much_accomplished) FROM events WHERE linked_todo_id = todos.todo_id)), 0)",
                        (authentication.user_id, start_date, end_date, authentication.user_id, end_date, start_date,
                         authentication.user_id, end_date))
         todos = []
@@ -169,6 +169,9 @@ def get_todos_by_goal_ids(auth_user: int, api_key: str, goal_ids: list[int]):
         authentication = Authentication(auth_user, api_key)
         if not UserEndpoints.authenticate(authentication):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
+        if len(goal_ids) == 0:
+            return {"todos": {}}
+
         in_clause = ""
         in_params = ()
         for goal_id in goal_ids:
@@ -238,7 +241,7 @@ def delete_todo(auth_user: int, api_key: str, todo_id: int):
     try:
         get_todo(auth_user, api_key, todo_id)  # authenticate
         cursor.execute("DELETE FROM todos WHERE todo_id = %s", (todo_id,))
-        return f"successfully deleted todo with id: '{todo_id}'"
+        return {"message": f"successfully deleted todo with id: '{todo_id}'"}
     finally:
         conn.close()
 
@@ -252,6 +255,7 @@ def delete_todos_of_user(auth_user: int, api_key: str):
         if not UserEndpoints.authenticate(authentication):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         cursor.execute("DELETE FROM todos WHERE user_id = %s", (authentication.user_id,))
+        return {"message": f"successfully deleted todos of user: '{auth_user}'"}
     finally:
         conn.close()
 
@@ -263,8 +267,8 @@ def __validate_todo(authentication: Authentication, todo: ToDo):
         raise HTTPException(detail="User is not authenticated to create this resource", status_code=401)
     if todo.name is None:
         raise HTTPException(detail="todo missing a name", status_code=400)
-    elif len(todo.name) == 0:
-        raise HTTPException(detail="todo missing a name", status_code=400)
+    #elif len(todo.name) == 0:
+    #    raise HTTPException(detail="todo missing a name", status_code=400)
     elif len(todo.name) > 32:
         raise HTTPException(detail="todo name must not exceed 32 characters", status_code=400)
     if todo.startDate is None:

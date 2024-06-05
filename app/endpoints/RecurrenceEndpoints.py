@@ -107,6 +107,7 @@ def update_recurrence(authentication: Authentication, recurrence_id: int, update
              updated_recurrence.goalHowMuch,
              updated_recurrence.goalMeasuringUnits,
              updated_recurrence.goalTimeframe,
+             updated_recurrence.goalPriorityLevel,
              recurrence_id))
 
         __generate_recurrence_instances_for_new_recurrence(authentication, updated_recurrence)
@@ -134,7 +135,7 @@ def set_recurrence_end(authentication: Authentication, recurrence_id: int, end: 
         rule = rule.replace(until=datetime.strptime(end, "%Y-%m-%d"))
         cursor.execute(f"UPDATE recurrences SET {RRULE_STRING} = %s WHERE recurrence_id = %s",
                        (str(rule), recurrence_id))
-        delete_recurrence_instances_after_date(authentication, recurrence_id, end, False)
+        delete_recurrence_instances_after_date(authentication.user_id, authentication.api_key, recurrence_id, end, False)
 
         return {"message": "successfully updated"}
     finally:
@@ -361,6 +362,8 @@ def __validate_recurrence(authentication: Authentication, recurrence: Recurrence
         if recurrence.goalMeasuringUnits is not None:
             if len(recurrence.goalMeasuringUnits) > 12 or len(recurrence.goalMeasuringUnits) == 0:
                 raise HTTPException(detail="goal measuring units must be between 1 and 12 characters in length", status_code=400)
+        if recurrence.goalPriorityLevel is None:
+            raise HTTPException(detail="goal must define a priority level", status_code=400)
     if recurrence.todoName is not None:
         if recurrence.todoTimeframe is None:
             raise HTTPException(detail="todo must define a valid timeframe", status_code=400)

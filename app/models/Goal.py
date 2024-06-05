@@ -14,12 +14,13 @@ class Goal(BaseModel):
     measuringUnits: Optional[str]
     startDate: Optional[str]
     deadlineDate: Optional[str]  # deadline to complete goal by. null = no deadline
+    priorityLevel: Optional[int]
     # recurring goal stuff
     recurrenceId: Optional[int]
     recurrenceDate: Optional[str]  # the day of the recurrence instance (user may modify the actual startInstance later, but this value won't change)
 
     def get_sql_insert_query(self):
-        return "INSERT INTO goals VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
+        return "INSERT INTO goals VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
 
     def get_sql_insert_params(self):
         return (None,
@@ -30,6 +31,7 @@ class Goal(BaseModel):
                 self.measuringUnits,
                 self.startDate,
                 self.deadlineDate,
+                self.priorityLevel,
                 self.recurrenceId,
                 self.recurrenceDate)
 
@@ -60,6 +62,7 @@ class Goal(BaseModel):
             measuringUnits=src[MEASURING_UNITS],
             startDate=src[START_DATE],
             deadlineDate=src[DEADLINE_DATE],
+            priorityLevel=src[PRIORITY_LEVEL],
             recurrenceId=src[RECURRENCE_ID],
             recurrenceDate=src[RECURRENCE_DATE]
         )

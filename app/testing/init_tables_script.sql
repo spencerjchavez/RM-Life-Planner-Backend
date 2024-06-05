@@ -22,8 +22,6 @@ CREATE UNIQUE INDEX username_index ON users(username);
 
 CREATE TABLE user_preferences (
     user_id INT UNSIGNED PRIMARY KEY,
-
-    highest_priority_color varchar(8) not null,
     very_high_priority_color varchar(8) not null,
     high_priority_color varchar(8) not null,
     medium_priority_color varchar(8) not null,
@@ -49,7 +47,6 @@ create table desires(
     date_created DATE not null,
     deadline DATE,
     date_retired DATE,
-    priority_level int,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 CREATE INDEX user_id_index ON desires(user_id);
@@ -77,6 +74,7 @@ create table recurrences (
     goal_how_much float,
     goal_measuring_units varchar(12),
     goal_timeframe ENUM ('DAY', 'WEEK', 'MONTH', 'YEAR'), -- can be a day, a week, or a month in length, depending on rrule
+    goal_priority_level int,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (goal_desire_id) REFERENCES desires(desire_id)
 );
@@ -91,6 +89,7 @@ create table goals(
     measuring_units varchar(12),
     start_date DATE not null,
     deadline_date DATE, -- null == goal is indefinite.
+    priority_level int,
     -- recurring goal stuff
     recurrence_id bigint unsigned,
     recurrence_date DATE,
@@ -149,6 +148,7 @@ create table events(
 
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (linked_todo_id) REFERENCES todos(todo_id),
+    FOREIGN KEY (linked_goal_id) REFERENCES goals(goal_id),
     FOREIGN KEY (recurrence_id) REFERENCES recurrences(recurrence_id)
 );
 CREATE INDEX todo_id_index ON events (linked_todo_id);

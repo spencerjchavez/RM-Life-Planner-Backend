@@ -50,7 +50,7 @@ class ToDo(BaseModel):
             src[RECURRENCE_DATE] = src[RECURRENCE_DATE].strftime("%Y-%m-%d")
 
         return ToDo(todoId=src["todo_id"],
-                    userID=src[USER_ID],
+                    userId=src[USER_ID],
                     name=src[NAME],
                     startDate=src[START_DATE],
                     deadlineDate=src[DEADLINE_DATE],

@@ -1,5 +1,7 @@
 # CREATED JUNE OF 2023 BY SPENCER CHAVEZ
 from typing import Optional
+
+import mysql.connector.errors
 from mysql.connector.pooling import PooledMySQLConnection
 from app.db_connections import DBConnections
 from app.extras.SQLDateValidator import *
@@ -40,7 +42,7 @@ def create_desire(authentication: Authentication, desire: Desire):
         params = desire.get_sql_insert_params()
         cursor.execute(query, params)
 
-        return {"message": "Desire created successfully", "desire_id": cursor.lastrowid}
+        return {"desire_id": cursor.lastrowid}
     finally:
         conn.close()
 
@@ -60,7 +62,23 @@ def get_desire(auth_user: int, api_key: str, desire_id: int):
             raise HTTPException(detail="no such desire exists", status_code=404)
         if res["user_id"] != user_id:
             raise HTTPException(detail="User is not authenticated to access this resource", status_code=401)
-        return {"message": "successfully got desire", "desire": Desire.from_sql_res(res)}
+        return {"desire": Desire.from_sql_res(res)}
+    finally:
+        conn.close()
+
+@router.get("/api/desires/by-user-id/{user_id}")
+def get_desires_by_user_id(auth_user: int, api_key: str, user_id: int):
+    conn: PooledMySQLConnection = DBConnections.get_db_connection()
+    cursor: CMySQLCursorDict = conn.cursor(dictionary=True)
+    try:
+        user_id = auth_user
+        if not UserEndpoints.authenticate(Authentication(auth_user, api_key)):
+            raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
+        cursor.execute("SELECT * FROM desires WHERE user_id=%s AND date_retired IS NULL", (user_id,))
+        desires = []
+        for desire in cursor.fetchall():
+            desires.append(Desire.from_sql_res(desire))
+        return {"desires": desires}
     finally:
         conn.close()
 
@@ -73,8 +91,8 @@ def update_desire(authentication: Authentication, desire_id: int, updated_desire
         get_desire(authentication.user_id, authentication.api_key, desire_id)
         updated_desire.desireId = desire_id
         __validate_desire(authentication, updated_desire)
-        query = f"UPDATE desires SET {NAME} = %s, {DEADLINE} = %s, {DATE_RETIRED} = %s, {PRIORITY_LEVEL} = %s WHERE desire_id = %s"
-        params = (updated_desire.name, updated_desire.deadline, updated_desire.dateRetired, updated_desire.priorityLevel, desire_id)
+        query = f"UPDATE desires SET {NAME} = %s, {DEADLINE} = %s, {DATE_RETIRED} = %s WHERE desire_id = %s"
+        params = (updated_desire.name, updated_desire.deadline, updated_desire.dateRetired, desire_id)
         cursor.execute(query, params)
         return {"message": f"Desire with ID {desire_id} updated successfully"}
     finally:
@@ -99,9 +117,12 @@ def delete_desire(auth_user: int, api_key: str, desire_id: int):
 
         cursor.execute("DELETE FROM desires WHERE desire_id = %s", (desire_id,))
 
-        return f"Desire with ID {desire_id} deleted successfully"
+        return {"message": f"Desire with ID {desire_id} deleted successfully"}
+    except mysql.connector.errors.IntegrityError as _:
+        raise HTTPException(detail="Cannot delete desire until all of its linked goals are deleted", status_code=400)
     finally:
         conn.close()
+
 
 
 def __validate_desire(authentication: Authentication, desire: Desire):
@@ -110,9 +131,11 @@ def __validate_desire(authentication: Authentication, desire: Desire):
     if authentication.user_id != desire.userId:
         raise HTTPException(detail="User is not authenticated to create this resource", status_code=401)
     if desire.name is None:
-        raise HTTPException(detail="desire missing a name", status_code=400)
+        desire.name = ""
+        #raise HTTPException(detail="desire missing a name", status_code=400)
     elif len(desire.name) == 0:
-        raise HTTPException(detail="desire missing a name", status_code=400)
+        pass
+        #raise HTTPException(detail="desire missing a name", status_code=400)
     elif len(desire.name) > 42:
         raise HTTPException(detail="desire name must not exceed 42 characters", status_code=400)
     if desire.dateCreated is None:
@@ -123,10 +146,6 @@ def __validate_desire(authentication: Authentication, desire: Desire):
             or desire.colorB < 0 or desire.colorB > 1 \
             or desire.colorG < 0 or desire.colorG > 1:
         raise HTTPException(detail="desire does not define a valid color", status_code=400)"""
-    if desire.priorityLevel is None:
-        raise HTTPException(detail="desire must indicate a priority level", status_code=400)
-    if desire.priorityLevel <= 0 or desire.priorityLevel > 5:
-        raise HTTPException(detail="desire priority level must be in range 1 - 5", status_code=400)
 
 
 #
@@ -148,7 +167,7 @@ def create_goal(authentication: Authentication, goal: Goal):
         params = goal.get_sql_insert_params()
         cursor.execute(stmt, params)
         goal.goalId = cursor.lastrowid
-        return {"message": "Goal created successfully", "goal_id": goal.goalId}
+        return {"goal_id": goal.goalId}
     finally:
         conn.close()
 
@@ -246,7 +265,9 @@ def get_goals_in_date_list(auth_user: int, api_key: str, dates: list[str], desir
     conn: PooledMySQLConnection = DBConnections.get_db_connection()
     cursor: CMySQLCursorDict = conn.cursor(dictionary=True)
     try:
-        _ = get_desire(auth_user, api_key, desire_id)
+        if desire_id:
+            # authenticate user to desire_id
+            _ = get_desire(auth_user, api_key, desire_id)
         authentication = Authentication(auth_user, api_key)
         if not UserEndpoints.authenticate(authentication):
             raise HTTPException(status_code=401, detail="User is not authenticated, please log in")
@@ -267,12 +288,12 @@ def get_goals_in_date_list(auth_user: int, api_key: str, dates: list[str], desir
                 cursor.execute("SELECT * FROM goals WHERE user_id = %s AND deadline_date >= %s AND start_date <= %s"
                                "UNION "
                                "SELECT * FROM goals WHERE user_id = %s AND start_date <= %s AND deadline_date IS NULL",
-                               (Authentication.user_id, date_str, date_str, authentication.user_id, date_str))
+                               (authentication.user_id, date_str, date_str, authentication.user_id, date_str))
             else:
                 cursor.execute("SELECT * FROM goals WHERE user_id = %s AND desire_id = %s AND deadline_date >= %s AND start_date <= %s"
                                "UNION "
                                "SELECT * FROM goals WHERE user_id = %s AND desire_id = %s AND start_date <= %s AND deadline_date IS NULL",
-                               (Authentication.user_id, desire_id, date_str, date_str, authentication.user_id, desire_id, date_str))
+                               (authentication.user_id, desire_id, date_str, date_str, authentication.user_id, desire_id, date_str))
             goals_by_day[date_str] = []
             res = cursor.fetchall()
             for row in res:
@@ -335,6 +356,8 @@ def delete_goal(auth_user: int, api_key: str, goal_id: int):
         get_goal(auth_user, api_key, goal_id)
         cursor.execute("DELETE FROM goals WHERE goal_id = %s", (goal_id,))
         return {"message": f"Goal with ID {goal_id} deleted successfully"}
+    except mysql.connector.errors.IntegrityError as _:
+        raise HTTPException(detail="Cannot delete goal until all of its linked events and todos are deleted", status_code=400)
     finally:
         conn.close()
 
@@ -345,9 +368,11 @@ def __validate_goal(authentication: Authentication, goal: Goal):
     if authentication.user_id != goal.userId:
         raise HTTPException(detail="User is not authenticated to create this resource", status_code=401)
     if goal.name is None:
-        raise HTTPException(detail="goal missing a name", status_code=400)
+        goal.name = ""
+        #raise HTTPException(detail="goal missing a name", status_code=400)
     elif len(goal.name) == 0:
-        raise HTTPException(detail="goal missing a name", status_code=400)
+        pass
+        #raise HTTPException(detail="goal missing a name", status_code=400)
     elif len(goal.name) > 42:
         raise HTTPException(detail="goal name must not exceed 42 characters", status_code=400)
     if goal.howMuch is None:
@@ -359,6 +384,10 @@ def __validate_goal(authentication: Authentication, goal: Goal):
             raise HTTPException(detail="measuring units cannot exceed 12 characters", status_code=400)
     if goal.startDate is None:
         raise HTTPException(detail="goal missing start date", status_code=400)
+    if goal.priorityLevel is None:
+        raise HTTPException(detail="goal must indicate a priority level", status_code=400)
+    if goal.priorityLevel <= 0 or goal.priorityLevel > 5:
+        raise HTTPException(detail="goal priority level must be in range 1 - 5", status_code=400)
     try:
         start_dt = datetime.strptime(goal.startDate, "%Y-%m-%d")
         if goal.deadlineDate is not None:

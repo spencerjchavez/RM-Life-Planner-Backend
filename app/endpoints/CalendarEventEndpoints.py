@@ -11,6 +11,7 @@ from app.models.CalendarEvent import CalendarEvent
 from app.models.Authentication import Authentication
 from app.extras.SQLColumnNames import *
 from app.endpoints import CalendarToDoEndpoints, RecurrenceEndpoints, UserEndpoints, GoalAchievingEndpoints
+from app.models.ToDo import ToDo
 
 router = APIRouter()
 
@@ -27,9 +28,10 @@ def create_calendar_event(authentication: Authentication, event: CalendarEvent):
             event.get_sql_events_insert_query(),
             event.get_sql_insert_params())
         event.eventId = cursor.lastrowid
-        __update_goal_deadline_after_altering_event(event)
+        #TODO: uncomment this out
+        #__update_goal_deadline_after_altering_event(event)
 
-        return {"message": "event successfully added", "event_id": event.eventId}
+        return {"event_id": event.eventId}
     finally:
         conn.close()
 
@@ -45,7 +47,7 @@ def get_calendar_event(auth_user: int, api_key: str, event_id: int):
         cursor.execute("SELECT * FROM events WHERE event_id = %s", (event_id,))
         res = cursor.fetchone()
         if res is None:
-            raise HTTPException(detail="specified event does not exist", status_code=404)
+            return {"event": None} #raise HTTPException(detail="specified event does not exist", status_code=404)
         if res["user_id"] != authentication.user_id:
             raise HTTPException(detail="User is not authenticated to access this resource", status_code=401)
         return {"event": CalendarEvent.from_sql_res(res)}
@@ -63,7 +65,6 @@ def get_calendar_events_by_date_list(auth_user: int, api_key: str, dates: list[s
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         if len(dates) == 0:
             raise HTTPException(detail="get_calendar_events_by_date_list requires a list of dates to return events for", status_code=400)
-        in_clause = ""
         year_months = set()
         for date_str in dates:
             if not validate_date(date_str):
@@ -77,9 +78,10 @@ def get_calendar_events_by_date_list(auth_user: int, api_key: str, dates: list[s
 
         events_by_day = {}
         for date_str in dates:
+            events_by_day.setdefault(date_str, [])
             cursor.execute("SELECT * FROM events WHERE user_id = %s AND start_date <= %s AND end_date >= %s", (authentication.user_id, date_str, date_str))
             for row in cursor.fetchall():
-                events_by_day.setdefault(date_str, []).append(CalendarEvent.from_sql_res(row))
+                events_by_day[date_str].append(CalendarEvent.from_sql_res(row))
         return {"events": events_by_day}
     finally:
         conn.close()
@@ -167,6 +169,7 @@ def update_calendar_event(authentication: Authentication, event_id: int, updated
     try:
         original_event = get_calendar_event(authentication.user_id, authentication.api_key, event_id)["event"]
         updated_event.eventId = event_id
+        updated_event.linkedTodoId = original_event.linkedTodoId  # TODO: delete this
         __validate_event(authentication, updated_event)
         cursor.execute(f"UPDATE events SET {NAME} = %s, {DESCRIPTION} = %s, {IS_HIDDEN} = %s, {START_DATE} = %s, {START_TIME} = %s, {END_DATE} = %s, {END_TIME} = %s, {LINKED_TODO_ID} = %s, {HOW_MUCH_ACCOMPLISHED} = %s, {NOTES} = %s WHERE event_id = %s",
             (updated_event.name,
@@ -180,7 +183,7 @@ def update_calendar_event(authentication: Authentication, event_id: int, updated
              updated_event.howMuchAccomplished,
              updated_event.notes,
              event_id))
-        __update_goal_deadline_after_altering_event(updated_event)
+        #__update_goal_deadline_after_altering_event(updated_event)
         return {"message": "success"}
     finally:
         conn.close()
@@ -194,7 +197,7 @@ def delete_event(auth_user: int, api_key: str, event_id: int):
         get_calendar_event(auth_user, api_key, event_id)  # authenticate
         cursor.execute("DELETE FROM events WHERE event_id = %s", (event_id,))
 
-        return f"successfully deleted event with id: '{event_id}'"
+        return {"message": f"successfully deleted event with id: '{event_id}'"}
     finally:
         conn.close()
 
@@ -208,6 +211,7 @@ def delete_events_of_user(auth_user: int, api_key: str):
         if not UserEndpoints.authenticate(authentication):
             raise HTTPException(detail="User is not authenticated, please log in", status_code=401)
         cursor.execute("DELETE FROM events WHERE user_id = %s", (authentication.user_id,))
+        return {"message": f"successfully deleted events of user: '{auth_user}'"}
     finally:
         conn.close()
 
@@ -218,7 +222,9 @@ def __update_goal_deadline_after_altering_event(event: CalendarEvent):
     try:
         if event.linkedGoalId is None:
             return
-        if event.howMuchAccomplished is None or event.howMuchAccomplished <= 0:
+        if event.howMuchAccomplished is None:
+            return
+        if event.howMuchAccomplished <= 0:
             return
         cursor.execute("SELECT how_much FROM goals WHERE goal_id = %s ", (event.linkedGoalId,))
         goal_how_much = cursor.fetchone()['how_much']
@@ -266,9 +272,9 @@ def __validate_event(authentication: Authentication, event: CalendarEvent):
     if event.description is not None:
         if len(event.description) > 500:
             raise HTTPException(detail="event description must not exceed 500 characters", status_code=400)
-    # check authentication on todoId
     if event.howMuchAccomplished is not None and event.linkedTodoId is None:
         raise HTTPException(detail="event must define a linkedTodoId in order to define the how much accomplished property", status_code=400)
+    # check authentication on todoId
     if event.linkedTodoId is not None:
         todo = CalendarToDoEndpoints.get_todo(authentication.user_id, authentication.api_key, event.linkedTodoId)["todo"]
         if todo.linkedGoalId != event.linkedGoalId:
